@@ -44,8 +44,6 @@ export const validateBudgetExist = async (
       res.status(404).json({ error: error.message });
       return;
     }
-    res.json(budget);
-
     req.budget = budget;
 
     next();
@@ -75,3 +73,5 @@ export const validateBudgetInput = async (
 
   next();
 };
+
+
