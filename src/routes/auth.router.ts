@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { body, param } from 'express-validator';
 import { AuthController } from '../controllers/auth.controller';
 import { handleInputErrors } from '../middleware/validation.middleware';
-import { limiter } from '../config/limiter';
+import { limiter } from '../config/limiter.config';
 import { authenticate } from '../middleware/auth.middleware';
 
 const router = Router();

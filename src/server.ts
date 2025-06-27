@@ -1,7 +1,7 @@
 import express from 'express';
 import colors from 'colors';
 import morgan from 'morgan';
-import { db } from './config/db';
+import { db } from './config/db.config';
 import budgetRouter from './routes/budget.router';
 import authRouter from './routes/auth.router';
 

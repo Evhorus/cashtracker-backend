@@ -1,4 +1,4 @@
-import { transport } from '../config/nodemailer';
+import { transport } from '../config/nodemailer.config';
 
 type EmailData = {
   name: string;
