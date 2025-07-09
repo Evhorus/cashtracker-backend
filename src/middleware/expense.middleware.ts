@@ -2,7 +2,6 @@ import type { Request, Response, NextFunction } from 'express';
 import { body, param, validationResult } from 'express-validator';
 import Expense from '../models/expense.model';
 
-
 declare global {
   namespace Express {
     interface Request {
@@ -11,7 +10,6 @@ declare global {
   }
 }
 
-
 export const validateExpenseId = async (
   req: Request,
   res: Response,
@@ -19,12 +17,12 @@ export const validateExpenseId = async (
 ) => {
   await param('expenseId')
     .isInt()
-    .withMessage('ID no válido')
+    .withMessage('Invalid ID')
     .custom((value) => value > 0)
-    .withMessage('ID no válido')
+    .withMessage('Invalid ID')
     .run(req);
 
-  let errors = validationResult(req);
+  const errors = validationResult(req);
   if (!errors.isEmpty()) {
     res.status(400).json({ errors: errors.array() });
     return;
@@ -32,9 +30,7 @@ export const validateExpenseId = async (
   next();
 };
 
-
-
-export const validateExpenseExist = async (
+export const validateExpenseExists = async (
   req: Request,
   res: Response,
   next: NextFunction,
@@ -52,11 +48,9 @@ export const validateExpenseExist = async (
 
     next();
   } catch (error) {
-    // console.log(error)
     res.status(500).json({ error: 'There was an error' });
   }
 };
-
 
 export const validateExpenseInput = async (
   req: Request,
@@ -65,16 +59,29 @@ export const validateExpenseInput = async (
 ) => {
   await body('name')
     .notEmpty()
-    .withMessage('El nombre del gasto no puede ir vació')
+    .withMessage('Expense name cannot be empty')
     .run(req);
   await body('amount')
     .notEmpty()
-    .withMessage('La cantidad del gasto no puede ir vació')
+    .withMessage('Expense amount cannot be empty')
     .isNumeric()
-    .withMessage('Cantidad no válida')
+    .withMessage('Invalid amount')
     .custom((value) => value > 0)
-    .withMessage('El gasto debe ser mayor a 0')
+    .withMessage('Expense must be greater than 0')
     .run(req);
 
+  next();
+};
+
+export const belongsToBudget = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  if (req.budget.id !== req.expense.budgetId) {
+    const error = new Error('Invalid action');
+    res.status(403).json({ error: error.message });
+    return;
+  }
   next();
 };

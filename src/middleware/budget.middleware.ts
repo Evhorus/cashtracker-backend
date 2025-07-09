@@ -17,12 +17,14 @@ export const validateBudgetId = async (
 ) => {
   await param('budgetId')
     .isInt()
-    .withMessage('ID no válido')
+    .withMessage('Invalid ID')
+    .bail()
     .custom((value) => value > 0)
-    .withMessage('ID no válido')
+    .withMessage('Invalid ID')
+    .bail()
     .run(req);
 
-  let errors = validationResult(req);
+  const errors = validationResult(req);
   if (!errors.isEmpty()) {
     res.status(400).json({ errors: errors.array() });
     return;
@@ -30,7 +32,7 @@ export const validateBudgetId = async (
   next();
 };
 
-export const validateBudgetExist = async (
+export const validateBudgetExists = async (
   req: Request,
   res: Response,
   next: NextFunction,
@@ -48,7 +50,6 @@ export const validateBudgetExist = async (
 
     next();
   } catch (error) {
-    // console.log(error)
     res.status(500).json({ error: 'There was an error' });
   }
 };
@@ -60,15 +61,15 @@ export const validateBudgetInput = async (
 ) => {
   await body('name')
     .notEmpty()
-    .withMessage('El nombre del presupuesto no puede ir vació')
+    .withMessage('Budget name cannot be empty')
     .run(req);
   await body('amount')
     .notEmpty()
-    .withMessage('La cantidad del presupuesto no puede ir vació')
+    .withMessage('Budget amount cannot be empty')
     .isNumeric()
-    .withMessage('Cantidad no válida')
+    .withMessage('Invalid amount')
     .custom((value) => value > 0)
-    .withMessage('El presupuesto debe ser mayor a 0')
+    .withMessage('Budget must be greater than 0')
     .run(req);
 
   next();
@@ -78,6 +79,7 @@ export const hasAccess = (req: Request, res: Response, next: NextFunction) => {
   if (req.budget.userId !== req.user.id) {
     const error = new Error('Invalid action');
     res.status(401).json({ error: error.message });
+    return;
   }
 
   next();

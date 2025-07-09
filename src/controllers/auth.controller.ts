@@ -10,19 +10,26 @@ export class AuthController {
     try {
       const { email, password } = req.body;
 
-      //Prevent duplicates
+      // Prevent duplicates
       const userExists = await User.findOne({ where: { email } });
 
       if (userExists) {
-        const error = new Error(`A user with email ${email} already exists`);
+        const error = new Error(
+          `A user with the email ${email} is already registered`,
+        );
         res.status(409).json({ error: error.message });
         return;
       }
 
-      const user = new User(req.body);
-
+      const user = await User.create(req.body);
       user.password = await hashPassword(password);
-      user.token = generateToken();
+      const token = generateToken();
+      user.token = token;
+
+      if (process.env.NODE_ENV !== 'production') {
+        globalThis.cashTrackerConfirmationToken = token;
+      }
+
       await user.save();
 
       await AuthEmail.sendConfirmationEmail({
@@ -30,9 +37,9 @@ export class AuthController {
         email: user.email,
         token: user.token,
       });
-      res.json('Account created successfully');
+      res.status(201).json('Account created successfully');
     } catch (error) {
-      // console.log(error)
+      console.log(error);
       res.status(500).json({ error: 'There was an error' });
     }
   };
@@ -43,7 +50,7 @@ export class AuthController {
     const user = await User.findOne({ where: { token } });
 
     if (!user) {
-      const error = new Error('user not found');
+      const error = new Error('Invalid token');
       res.status(401).json({ error: error.message });
       return;
     }
@@ -53,7 +60,7 @@ export class AuthController {
 
     await user.save();
 
-    res.json('Account confirmed SuccessFully');
+    res.json('Account successfully confirmed');
   };
 
   static login = async (req: Request, res: Response) => {
@@ -62,13 +69,13 @@ export class AuthController {
     const user = await User.findOne({ where: { email } });
 
     if (!user) {
-      const error = new Error(`A user with email ${email} not found`);
+      const error = new Error(`User with email ${email} not found`);
       res.status(404).json({ error: error.message });
       return;
     }
 
     if (!user.confirmed) {
-      const error = new Error(`The Account has not been confirmed`);
+      const error = new Error(`The account has not been confirmed`);
       res.status(403).json({ error: error.message });
       return;
     }
@@ -76,7 +83,7 @@ export class AuthController {
     const isPasswordCorrect = await checkPassword(password, user.password);
 
     if (!isPasswordCorrect) {
-      const error = new Error(`password or email wrong`);
+      const error = new Error(`Incorrect password or email`);
       res.status(401).json({ error: error.message });
       return;
     }
@@ -92,7 +99,7 @@ export class AuthController {
     const user = await User.findOne({ where: { email } });
 
     if (!user) {
-      const error = new Error(`A user with email ${email} not found`);
+      const error = new Error(`User with email ${email} not found`);
       res.status(404).json({ error: error.message });
       return;
     }
@@ -120,9 +127,7 @@ export class AuthController {
       return;
     }
 
-    res.json('Valid Token');
-
-    console.log(token);
+    res.json('Valid token');
   };
 
   static resetPasswordWithToken = async (req: Request, res: Response) => {
@@ -163,6 +168,8 @@ export class AuthController {
       return;
     }
 
+    //Send email to user
+
     user.password = await hashPassword(password);
     await user.save();
     res.json('Password updated successfully');
@@ -186,5 +193,24 @@ export class AuthController {
 
   static user = async (req: Request, res: Response) => {
     res.json(req.user);
+  };
+
+  static updateUser = async (req: Request, res: Response) => {
+    const { name, email } = req.body;
+
+    try {
+      const existingUser = await User.findOne({ where: { email } });
+
+      if (existingUser && existingUser.id !== req.user.id) {
+        const error = new Error('This email is already registered');
+        res.status(409).json({ error: error.message });
+        return;
+      }
+
+      await User.update({ email, name }, { where: { id: req.user.id } });
+      res.json('User updated successfully');
+    } catch (error) {
+      res.status(500).json('There was an error');
+    }
   };
 }

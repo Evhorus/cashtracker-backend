@@ -11,36 +11,33 @@ router.use(limiter);
 
 router.post(
   '/create-account',
-  body('name').notEmpty().withMessage('El nombre no puede ir vació'),
+  body('name').notEmpty().withMessage('Name cannot be empty'),
   body('password')
     .isLength({ min: 8 })
-    .withMessage('El password es muy corto, mínimo 8 caracteres'),
-  body('email').isEmail().withMessage('E-mail no válido'),
+    .withMessage('Password is too short, minimum 8 characters'),
+  body('email').isEmail().withMessage('Invalid email'),
   handleInputErrors,
   AuthController.createAccount,
 );
 
 router.post(
   '/confirm-account',
-  body('token')
-    .notEmpty()
-    .isLength({ min: 6, max: 6 })
-    .withMessage('Token no válido'),
+  body('token').isLength({ min: 6, max: 6 }).withMessage('Invalid token'),
   handleInputErrors,
   AuthController.confirmAccount,
 );
 
 router.post(
   '/login',
-  body('email').isEmail().withMessage('E-mail no válido'),
-  body('password').notEmpty().withMessage('El password es obligatorio'),
+  body('email').isEmail().withMessage('Invalid email'),
+  body('password').notEmpty().withMessage('Password is required'),
   handleInputErrors,
   AuthController.login,
 );
 
 router.post(
   '/forgot-password',
-  body('email').isEmail().withMessage('E-mail no válido'),
+  body('email').isEmail().withMessage('Invalid email'),
   handleInputErrors,
   AuthController.forgotPassword,
 );
@@ -50,7 +47,7 @@ router.post(
   body('token')
     .notEmpty()
     .isLength({ min: 6, max: 6 })
-    .withMessage('Token no válido'),
+    .withMessage('Invalid token'),
   handleInputErrors,
   AuthController.validateToken,
 );
@@ -60,10 +57,10 @@ router.post(
   param('token')
     .notEmpty()
     .isLength({ min: 6, max: 6 })
-    .withMessage('Token no válido'),
+    .withMessage('Invalid token'),
   body('password')
     .isLength({ min: 8 })
-    .withMessage('El password es muy corto, mínimo 8 caracteres'),
+    .withMessage('Password is too short, minimum 8 characters'),
   handleInputErrors,
   AuthController.resetPasswordWithToken,
 );
@@ -73,10 +70,10 @@ router.post(
   authenticate,
   body('currentPassword')
     .notEmpty()
-    .withMessage('El password actual no puede ir vació'),
+    .withMessage('Current password cannot be empty'),
   body('password')
     .isLength({ min: 8 })
-    .withMessage('El password nuevo es muy corto, mínimo 8 caracteres'),
+    .withMessage('New password is too short, minimum 8 characters'),
   handleInputErrors,
   AuthController.updateCurrentPassword,
 );
@@ -84,13 +81,19 @@ router.post(
 router.post(
   '/check-password',
   authenticate,
-  body('password')
-    .notEmpty()
-    .withMessage('El password actual no puede ir vació'),
+  body('password').notEmpty().withMessage('Current password cannot be empty'),
   handleInputErrors,
   AuthController.checkPassword,
 );
 
 router.get('/user', authenticate, AuthController.user);
+router.put(
+  '/user',
+  authenticate,
+  body('name').notEmpty().withMessage('Name cannot be empty'),
+  body('email').isEmail().withMessage('Invalid email'),
+  handleInputErrors,
+  AuthController.updateUser,
+);
 
 export default router;

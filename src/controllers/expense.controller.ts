@@ -2,11 +2,9 @@ import type { Request, Response } from 'express';
 import Expense from '../models/expense.model';
 
 export class ExpensesController {
-  static getAll = async (req: Request, res: Response) => {};
-
   static create = async (req: Request, res: Response) => {
     try {
-      const expense = new Expense(req.body);
+      const expense = await Expense.create(req.body);
       expense.budgetId = req.budget.id;
       await expense.save();
       res.status(201).json('Expense added successfully');
@@ -14,7 +12,6 @@ export class ExpensesController {
       // console.log(error);
       res.status(500).json({ error: 'There was an error' });
     }
-    console.log(req.budget.id);
   };
 
   static getById = async (req: Request, res: Response) => {
