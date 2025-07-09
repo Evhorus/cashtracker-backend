@@ -26,13 +26,21 @@ Follow these steps to run the backend locally:
 
 1. **Clone the repository**
 
-    `git clone `
+    `git clone https://github.com/Evhorus/cashtracker-backend`
 
 2. **Install dependencies**
 
     `npm i`
 
-3. **Configure environment variables**
+3. **(Optional) Start PostgreSQL and pgAdmin with Docker**
+If you want to run the database and admin interface via Docker, make sure Docker and Docker Compose are installed.
+Then, start the services with:
+
+    ``docker compose up -d``
+
+    This will start only the PostgreSQL database and the pgAdmin admin interface as defined in the `docker-compose.yml` file.
+
+4. **Configure environment variables**
 
 Create a `.env` file at the root with environment variables:
 
@@ -47,7 +55,7 @@ Create a `.env` file at the root with environment variables:
 | `NODE_ENV`     | Environment (development/production) |
 | `FRONTEND_URL` | Allowed frontend URL for CORS        |
 
-4. **Run the development server**
+5. **Run the development server**
 
 The API will be available at your configured port (default: 4000).
 
