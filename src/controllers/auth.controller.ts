@@ -75,7 +75,13 @@ export class AuthController {
     }
 
     if (!user.confirmed) {
-      const error = new Error(`The account has not been confirmed`);
+      const error = new Error(`The account has not been confirmed, please check your email`);
+      await AuthEmail.sendConfirmationEmail({
+        name: user.name,
+        email: user.email,
+        token: user.token,
+      });
+
       res.status(403).json({ error: error.message });
       return;
     }
