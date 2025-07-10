@@ -31,9 +31,6 @@ app.get('/api', (req, res) => {
 app.use('/api/v1/budgets', budgetRouter);
 app.use('/api/v1/auth', authRouter);
 
-app.get('/', (req, res) => {
-  res.send('All good');
-});
 
 checkServer();
 
