@@ -54,6 +54,7 @@ Create a `.env` file at the root with environment variables:
 | `JWT_SECRET`   | Secret key for JWT tokens            |
 | `NODE_ENV`     | Environment (development/production) |
 | `FRONTEND_URL` | Allowed frontend URL for CORS        |
+| `API_URL`      | Server api URL                       |
 
 5. **Run the development server**
 
