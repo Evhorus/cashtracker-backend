@@ -6,7 +6,6 @@ type EmailData = {
   token: string;
 };
 
-
 export class AuthEmail {
   static sendConfirmationEmail = async (emailData: EmailData) => {
     await transport.sendMail({
@@ -20,6 +19,10 @@ export class AuthEmail {
             <p style="color: #4a5568;">Gracias por registrarte. Tu cuenta está casi lista.</p>
             <p style="color: #4a5568;">Haz clic en el siguiente botón para confirmar tu cuenta:</p>
             <a href="${process.env.FRONTEND_URL}/auth/confirm-account?email_verification_token=${emailData.token}" style="display: inline-block; margin: 16px 0; padding: 12px 24px; background: #38a169; color: #fff; border-radius: 4px; text-decoration: none; font-weight: bold;">Confirmar cuenta</a>
+            <p style="color: #4a5568;">O ingresa el siguiente código en la aplicación:</p>
+            <div style="font-size: 1.5em; letter-spacing: 0.2em; font-weight: bold; background: #f0fff4; color: #276749; padding: 12px 0; border-radius: 6px; text-align: center; margin-bottom: 18px;">
+              ${emailData.token}
+            </div>
             <hr style="margin: 32px 0; border: none; border-top: 1px solid #e2e8f0;">
             <p style="font-size: 0.9em; color: #a0aec0;">Si no creaste esta cuenta, puedes ignorar este correo.</p>
           </div>
@@ -39,7 +42,11 @@ export class AuthEmail {
             <h2 style="color: #2d3748;">Hola, ${emailData.name}</h2>
             <p style="color: #4a5568;">Has solicitado restablecer tu contraseña.</p>
             <p style="color: #4a5568;">Haz clic en el siguiente botón para crear una nueva contraseña:</p>
-            <a href="${process.env.FRONTEND_URL}/auth/new-password" style="display: inline-block; margin: 16px 0; padding: 12px 24px; background: #3182ce; color: #fff; border-radius: 4px; text-decoration: none; font-weight: bold;">Restablecer contraseña</a>
+            <a href="${process.env.FRONTEND_URL}/auth/new-password?verification_token=${emailData.token}" style="display: inline-block; margin: 16px 0; padding: 12px 24px; background: #3182ce; color: #fff; border-radius: 4px; text-decoration: none; font-weight: bold;">Restablecer contraseña</a>
+            <p style="color: #4a5568;">O ingresa el siguiente código en la aplicación:</p>
+            <div style="font-size: 1.5em; letter-spacing: 0.2em; font-weight: bold; background: #ebf8ff; color: #2b6cb0; padding: 12px 0; border-radius: 6px; text-align: center; margin-bottom: 18px;">
+              ${emailData.token}
+            </div>
             <hr style="margin: 32px 0; border: none; border-top: 1px solid #e2e8f0;">
             <p style="font-size: 0.9em; color: #a0aec0;">Si no solicitaste este cambio, puedes ignorar este correo.</p>
           </div>
