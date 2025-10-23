@@ -3,6 +3,7 @@ import {
   IsNotEmpty,
   IsNumber,
   IsOptional,
+  IsPositive,
   IsString,
 } from 'class-validator';
 
@@ -13,6 +14,7 @@ export class CreateExpenseDto {
 
   @IsNumber()
   @IsNotEmpty()
+  @IsPositive({ message: 'El monto debe ser mayor a 0' })
   amount: number;
 
   @IsOptional()
