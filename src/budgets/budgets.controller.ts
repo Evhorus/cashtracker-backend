@@ -52,17 +52,17 @@ export class BudgetsController {
   }
 
   @BudgetExists()
-  @Patch(':id')
+  @Patch(':budgetId')
   updateBudget(
-    @Param('budgetId', ParseUUIDPipe) budgetId: string,
+    @Param('budgetId') budgetId: string,
     @Body() updateBudgetDto: UpdateBudgetDto,
   ) {
     return this.budgetsService.update(budgetId, updateBudgetDto);
   }
 
   @BudgetExists()
-  @Delete(':id')
-  remove(@Param('id', ParseUUIDPipe) id: string) {
+  @Delete(':budgetId')
+  remove(@Param('budgetId') id: string) {
     return this.budgetsService.remove(id);
   }
 
@@ -70,7 +70,6 @@ export class BudgetsController {
    * Routes for Expense
    */
 
-  @ExpenseExists()
   @BudgetExists()
   @Post(':budgetId/expenses')
   createExpense(
