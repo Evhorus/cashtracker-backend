@@ -20,7 +20,7 @@ export class Expense {
   amount: number;
 
   @Column({ type: 'date' })
-  date: string;
+  date: Date;
 
   @Column({ type: 'text', nullable: true })
   description?: string;
