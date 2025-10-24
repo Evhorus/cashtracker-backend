@@ -1,3 +1,4 @@
+import helmet from 'helmet';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
@@ -7,6 +8,17 @@ async function bootstrap() {
   const logger = new Logger('CashTrackerMain');
 
   const app = await NestFactory.create(AppModule);
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", 'trusted-scripts.com'],
+        },
+      },
+      crossOriginEmbedderPolicy: envs.NODE_ENV === 'production', // útil si usas iframes o WebAssembly
+    }),
+  );
   app.setGlobalPrefix('api');
 
   app.useGlobalPipes(

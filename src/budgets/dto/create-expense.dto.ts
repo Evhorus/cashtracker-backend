@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import {
   IsDateString,
   IsNotEmpty,
@@ -6,10 +7,12 @@ import {
   IsPositive,
   IsString,
 } from 'class-validator';
+import { NormalizeStringPipe } from '../pipes/normalize-string.pipe';
 
 export class CreateExpenseDto {
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => new NormalizeStringPipe().transform(value))
   name: string;
 
   @IsNumber()
@@ -19,9 +22,10 @@ export class CreateExpenseDto {
 
   @IsOptional()
   @IsString()
+  @Transform(({ value }) => new NormalizeStringPipe().transform(value))
   description?: string;
 
   @IsNotEmpty()
   @IsDateString({}, { message: 'La fecha debe tener el formato YYYY-MM-DD' })
-  date: string;
+  date: Date;
 }

@@ -1,4 +1,5 @@
 import { Optional } from '@nestjs/common';
+import { Transform } from 'class-transformer';
 import {
   IsNotEmpty,
   IsNumber,
@@ -6,10 +7,12 @@ import {
   IsPositive,
   IsString,
 } from 'class-validator';
+import { NormalizeStringPipe } from '../pipes/normalize-string.pipe';
 
 export class CreateBudgetDto {
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => new NormalizeStringPipe().transform(value))
   name: string;
 
   @IsNumber()
@@ -19,9 +22,11 @@ export class CreateBudgetDto {
 
   @IsOptional()
   @IsString()
+  @Transform(({ value }) => new NormalizeStringPipe().transform(value))
   description?: string;
 
   @IsString()
   @Optional()
+  @Transform(({ value }) => new NormalizeStringPipe().transform(value))
   category?: string;
 }
