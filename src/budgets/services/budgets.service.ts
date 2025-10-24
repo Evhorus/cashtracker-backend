@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateBudgetDto } from '../dto/create-budget.dto';
@@ -17,14 +13,6 @@ export class BudgetsService {
   ) {}
 
   async create(userId: string, createBudgetDto: CreateBudgetDto) {
-    const budgetExists = await this.budgetsRepository.findOneBy({
-      name: createBudgetDto.name,
-    });
-
-    if (budgetExists) {
-      throw new ConflictException('Ya existe un presupuesto con ese nombre');
-    }
-
     const budget = this.budgetsRepository.create(createBudgetDto);
     await this.budgetsRepository.save({ ...budget, spent: 0, userId });
 
