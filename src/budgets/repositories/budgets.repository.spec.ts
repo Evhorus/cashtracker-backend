@@ -92,6 +92,7 @@ describe('BudgetsRepository', () => {
         orderBy: jest.fn().mockReturnThis(),
         getManyAndCount: jest.fn().mockResolvedValue([[mockBudget], 1]),
       };
+
       mockRepository.createQueryBuilder.mockReturnValue(
         mockQueryBuilder as any,
       );
