@@ -18,8 +18,8 @@ import { ExpensesService } from './services/expenses.service';
 import type { Request } from 'express';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
-import { BudgetExists } from './decorators/budget-exists';
-import { ExpenseExists } from './decorators/expense-exists';
+import { BudgetExists } from './decorators/budget-exists.decorator';
+import { ExpenseExists } from './decorators/expense-exists.decorator';
 
 @Controller('budgets')
 export class BudgetsController {

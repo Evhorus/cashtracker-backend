@@ -24,8 +24,11 @@ export class HealthCheckService {
 
       const response = await firstValueFrom(response$);
       this.logger.log(`Health check status: ${response.status}`);
-    } catch (error) {
-      this.logger.error(`Health check failed: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Health check failed: ${errorMessage}`, errorStack);
     }
   }
 }
