@@ -32,7 +32,7 @@ describe('ExpensesService', () => {
     spent: 200,
     userId: 'user-123',
     category: 'Food',
-    description: null,
+    description: undefined,
     expenses: [],
     createdAt: new Date(),
     updatedAt: new Date(),
