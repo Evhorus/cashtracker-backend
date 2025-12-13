@@ -5,6 +5,7 @@ import { CreateExpenseDto } from '../dto/create-expense.dto';
 import { Expense } from '../entities/expense.entity';
 import { Budget } from '../entities/budget.entity';
 import { UpdateExpenseDto } from '../dto/update-expense.dto';
+import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
 
 @Injectable()
 export class ExpensesService {
@@ -36,7 +37,7 @@ export class ExpensesService {
     const expense = await this.expensesRepository.findOneBy({ id });
 
     if (!expense) {
-      throw new NotFoundException('El gasto no fue encontrado');
+      throw new NotFoundException(ERROR_MESSAGES.EXPENSE_NOT_FOUND);
     }
 
     return expense;

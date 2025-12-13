@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { CreateBudgetDto } from '../dto/create-budget.dto';
 import { UpdateBudgetDto } from '../dto/update-budget.dto';
 import { Budget } from '../entities/budget.entity';
+import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
 
 @Injectable()
 export class BudgetsService {
@@ -38,7 +39,7 @@ export class BudgetsService {
     const budget = await this.budgetsRepository.findOneBy({ id });
 
     if (!budget) {
-      throw new NotFoundException('El presupuesto no fue encontrado');
+      throw new NotFoundException(ERROR_MESSAGES.BUDGET_NOT_FOUND);
     }
 
     return budget;
@@ -51,7 +52,7 @@ export class BudgetsService {
     });
 
     if (!budget) {
-      throw new NotFoundException('El presupuesto no fue encontrado');
+      throw new NotFoundException(ERROR_MESSAGES.BUDGET_NOT_FOUND);
     }
 
     return budget;
