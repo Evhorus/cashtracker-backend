@@ -1,23 +1,21 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { CreateBudgetDto } from '../dto/create-budget.dto';
 import { UpdateBudgetDto } from '../dto/update-budget.dto';
-import { Budget } from '../entities/budget.entity';
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
 import { BudgetResponseDto } from '../dto/budget-response.dto';
 import { BudgetWithExpensesResponseDto } from '../dto/budget-with-expenses-response.dto';
+import { BudgetsRepository } from '../repositories/budgets.repository';
 
 @Injectable()
 export class BudgetsService {
-  constructor(
-    @InjectRepository(Budget)
-    private readonly budgetsRepository: Repository<Budget>,
-  ) {}
+  constructor(private readonly budgetsRepository: BudgetsRepository) {}
 
   async create(userId: string, createBudgetDto: CreateBudgetDto) {
-    const budget = this.budgetsRepository.create(createBudgetDto);
-    await this.budgetsRepository.save({ ...budget, spent: 0, userId });
+    await this.budgetsRepository.create({
+      ...createBudgetDto,
+      spent: 0,
+      userId,
+    });
 
     return {
       message: 'Presupuesto creado',
@@ -29,20 +27,8 @@ export class BudgetsService {
    * More efficient than findAll when expenses are not needed
    */
   async findAllLight(userId: string) {
-    const [budgets, count] = await this.budgetsRepository.findAndCount({
-      where: { userId },
-      select: [
-        'id',
-        'name',
-        'amount',
-        'spent',
-        'category',
-        'description',
-        'createdAt',
-        'updatedAt',
-      ],
-      order: { createdAt: 'DESC' },
-    });
+    const [budgets, count] =
+      await this.budgetsRepository.findByUserIdLight(userId);
 
     return {
       count,
@@ -55,12 +41,8 @@ export class BudgetsService {
    * Use this when you need expense data
    */
   async findAll(userId: string) {
-    const [budgets, count] = await this.budgetsRepository
-      .createQueryBuilder('budget')
-      .leftJoinAndSelect('budget.expenses', 'expense')
-      .where('budget.userId = :userId', { userId })
-      .orderBy('budget.createdAt', 'DESC')
-      .getManyAndCount();
+    const [budgets, count] =
+      await this.budgetsRepository.findByUserIdWithExpenses(userId);
 
     return {
       count,
@@ -69,7 +51,7 @@ export class BudgetsService {
   }
 
   async findOne(id: string) {
-    const budget = await this.budgetsRepository.findOneBy({ id });
+    const budget = await this.budgetsRepository.findById(id);
 
     if (!budget) {
       throw new NotFoundException(ERROR_MESSAGES.BUDGET_NOT_FOUND);
@@ -79,10 +61,7 @@ export class BudgetsService {
   }
 
   async findOnePlain(id: string) {
-    const budget = await this.budgetsRepository.findOne({
-      where: { id },
-      relations: { expenses: true },
-    });
+    const budget = await this.budgetsRepository.findByIdWithExpenses(id);
 
     if (!budget) {
       throw new NotFoundException(ERROR_MESSAGES.BUDGET_NOT_FOUND);
@@ -93,8 +72,7 @@ export class BudgetsService {
 
   async update(id: string, updateBudgetDto: UpdateBudgetDto) {
     await this.findOne(id);
-    const budget = this.budgetsRepository.create(updateBudgetDto);
-    await this.budgetsRepository.update(id, budget);
+    await this.budgetsRepository.update(id, updateBudgetDto);
     return {
       message: 'Presupuesto Actualizado',
     };

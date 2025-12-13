@@ -1,39 +1,33 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { CreateExpenseDto } from '../dto/create-expense.dto';
-import { Expense } from '../entities/expense.entity';
 import { Budget } from '../entities/budget.entity';
 import { UpdateExpenseDto } from '../dto/update-expense.dto';
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
 import { ExpenseResponseDto } from '../dto/expense-response.dto';
+import { ExpensesRepository } from '../repositories/expenses.repository';
+import { BudgetsRepository } from '../repositories/budgets.repository';
 
 @Injectable()
 export class ExpensesService {
   constructor(
-    @InjectRepository(Expense)
-    private readonly expensesRepository: Repository<Expense>,
-    @InjectRepository(Budget)
-    private readonly budgetsRepository: Repository<Budget>,
+    private readonly expensesRepository: ExpensesRepository,
+    private readonly budgetsRepository: BudgetsRepository,
     private readonly dataSource: DataSource,
   ) {}
 
   async create(budgetId: string, createExpenseDto: CreateExpenseDto) {
     return this.dataSource.transaction(async (manager) => {
-      const expense = manager.create(Expense, {
-        ...createExpenseDto,
-        budgetId,
-      });
-
-      await manager.save(expense);
+      const expense = await this.expensesRepository.create(
+        {
+          ...createExpenseDto,
+          budgetId,
+        },
+        manager,
+      );
 
       // Incremental update - more efficient than recalculation
-      await manager.increment(
-        Budget,
-        { id: budgetId },
-        'spent',
-        expense.amount,
-      );
+      await this.budgetsRepository.incrementSpent(budgetId, expense.amount);
 
       return {
         message: 'Gasto creado',
@@ -42,7 +36,7 @@ export class ExpensesService {
   }
 
   async findOne(id: string) {
-    const expense = await this.expensesRepository.findOneBy({ id });
+    const expense = await this.expensesRepository.findById(id);
 
     if (!expense) {
       throw new NotFoundException(ERROR_MESSAGES.EXPENSE_NOT_FOUND);
@@ -56,7 +50,7 @@ export class ExpensesService {
    * Use this for internal validation logic
    */
   async findOneInternal(id: string) {
-    const expense = await this.expensesRepository.findOneBy({ id });
+    const expense = await this.expensesRepository.findById(id);
 
     if (!expense) {
       throw new NotFoundException(ERROR_MESSAGES.EXPENSE_NOT_FOUND);
@@ -75,16 +69,20 @@ export class ExpensesService {
     updateExpenseDto: UpdateExpenseDto;
   }) {
     return this.dataSource.transaction(async (manager) => {
-      const oldExpense = await this.findOne(expenseId);
+      const oldExpense = await this.findOneInternal(expenseId);
 
-      await manager.update(Expense, expenseId, updateExpenseDto);
+      await this.expensesRepository.update(
+        expenseId,
+        updateExpenseDto,
+        manager,
+      );
 
       // Calculate difference and update incrementally
       const newAmount = updateExpenseDto.amount ?? oldExpense.amount;
       const difference = newAmount - oldExpense.amount;
 
       if (difference !== 0) {
-        await manager.increment(Budget, { id: budget.id }, 'spent', difference);
+        await this.budgetsRepository.incrementSpent(budget.id, difference);
       }
 
       return { message: 'Gasto actualizado' };
@@ -93,17 +91,12 @@ export class ExpensesService {
 
   async remove(budget: Budget, expenseId: string) {
     return this.dataSource.transaction(async (manager) => {
-      const expense = await this.findOne(expenseId);
+      const expense = await this.findOneInternal(expenseId);
 
-      await manager.delete(Expense, { id: expenseId });
+      await this.expensesRepository.delete(expenseId, manager);
 
       // Decrement spent by expense amount
-      await manager.decrement(
-        Budget,
-        { id: budget.id },
-        'spent',
-        expense.amount,
-      );
+      await this.budgetsRepository.decrementSpent(budget.id, expense.amount);
 
       return { message: 'Gasto eliminado' };
     });
