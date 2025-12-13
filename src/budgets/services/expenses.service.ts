@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { CreateExpenseDto } from '../dto/create-expense.dto';
 import { Expense } from '../entities/expense.entity';
 import { Budget } from '../entities/budget.entity';
 import { UpdateExpenseDto } from '../dto/update-expense.dto';
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
+import { ExpenseResponseDto } from '../dto/expense-response.dto';
 
 @Injectable()
 export class ExpensesService {
@@ -47,7 +48,7 @@ export class ExpensesService {
       throw new NotFoundException(ERROR_MESSAGES.EXPENSE_NOT_FOUND);
     }
 
-    return expense;
+    return ExpenseResponseDto.fromEntity(expense);
   }
 
   async update({

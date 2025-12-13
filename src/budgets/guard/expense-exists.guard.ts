@@ -9,12 +9,12 @@ import {
 
 import { Request } from 'express';
 import { ExpensesService } from '../services/expenses.service';
-import { Expense } from '../entities/expense.entity';
+import { ExpenseResponseDto } from '../dto/expense-response.dto';
 import { isUUID } from 'class-validator';
 
 declare module 'express' {
   interface Request {
-    expense?: Expense;
+    expense?: ExpenseResponseDto;
   }
 }
 

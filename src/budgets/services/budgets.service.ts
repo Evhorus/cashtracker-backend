@@ -5,6 +5,8 @@ import { CreateBudgetDto } from '../dto/create-budget.dto';
 import { UpdateBudgetDto } from '../dto/update-budget.dto';
 import { Budget } from '../entities/budget.entity';
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
+import { BudgetResponseDto } from '../dto/budget-response.dto';
+import { BudgetWithExpensesResponseDto } from '../dto/budget-with-expenses-response.dto';
 
 @Injectable()
 export class BudgetsService {
@@ -44,7 +46,7 @@ export class BudgetsService {
 
     return {
       count,
-      data: budgets,
+      data: BudgetResponseDto.fromEntities(budgets),
     };
   }
 
@@ -62,7 +64,7 @@ export class BudgetsService {
 
     return {
       count,
-      data: budgets,
+      data: budgets.map(BudgetWithExpensesResponseDto.fromEntity),
     };
   }
 
@@ -86,7 +88,7 @@ export class BudgetsService {
       throw new NotFoundException(ERROR_MESSAGES.BUDGET_NOT_FOUND);
     }
 
-    return budget;
+    return BudgetWithExpensesResponseDto.fromEntity(budget);
   }
 
   async update(id: string, updateBudgetDto: UpdateBudgetDto) {
