@@ -184,7 +184,11 @@ describe('BudgetsService', () => {
       // Arrange
       const updateDto = { name: 'Updated Budget', amount: 600 };
       repository.findById.mockResolvedValue(mockBudget);
-      repository.update.mockResolvedValue(undefined);
+      repository.update.mockResolvedValue({
+        affected: 1,
+        raw: [],
+        generatedMaps: [],
+      });
 
       // Act
       const result = await service.update('budget-123', updateDto);

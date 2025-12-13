@@ -170,7 +170,11 @@ describe('ExpensesService', () => {
       // Arrange
       const updateDto = { amount: 75 }; // Increase by 25
       expensesRepository.findById.mockResolvedValue(mockExpense); // amount: 50
-      expensesRepository.update.mockResolvedValue(undefined);
+      expensesRepository.update.mockResolvedValue({
+        affected: 1,
+        raw: [],
+        generatedMaps: [],
+      });
 
       // Act
       const result = await service.update({
@@ -214,7 +218,7 @@ describe('ExpensesService', () => {
     it('should delete expense and decrement budget spent', async () => {
       // Arrange
       expensesRepository.findById.mockResolvedValue(mockExpense);
-      expensesRepository.delete.mockResolvedValue(undefined);
+      expensesRepository.delete.mockResolvedValue({ affected: 1, raw: [] });
 
       // Act
       const result = await service.remove(mockBudget, 'expense-123');
