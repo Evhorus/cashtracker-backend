@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { CreateExpenseDto } from '../dto/create-expense.dto';
 import { Expense } from '../entities/expense.entity';
 import { Budget } from '../entities/budget.entity';
@@ -13,21 +13,23 @@ export class ExpensesService {
     private readonly expensesRepository: Repository<Expense>,
     @InjectRepository(Budget)
     private readonly budgetsRepository: Repository<Budget>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(budgetId: string, createExpenseDto: CreateExpenseDto) {
-    const expense = this.expensesRepository.create(createExpenseDto);
+    return this.dataSource.transaction(async (manager) => {
+      const expense = manager.create(Expense, {
+        ...createExpenseDto,
+        budgetId,
+      });
 
-    await this.expensesRepository.save({
-      ...expense,
-      budgetId,
+      await manager.save(expense);
+      await this.recalculateSpent(budgetId, manager);
+
+      return {
+        message: 'Gasto creado',
+      };
     });
-
-    await this.recalculateSpent(budgetId);
-
-    return {
-      message: 'Gasto creado',
-    };
   }
 
   async findOne(id: string) {
@@ -49,27 +51,36 @@ export class ExpensesService {
     expenseId: string;
     updateExpenseDto: UpdateExpenseDto;
   }) {
-    await this.findOne(expenseId);
+    return this.dataSource.transaction(async (manager) => {
+      await this.findOne(expenseId);
 
-    await this.expensesRepository.update(expenseId, updateExpenseDto);
+      await manager.update(Expense, expenseId, updateExpenseDto);
+      await this.recalculateSpent(budget.id, manager);
 
-    await this.recalculateSpent(budget.id);
-
-    return { message: 'Gasto actualizado' };
+      return { message: 'Gasto actualizado' };
+    });
   }
 
   async remove(budget: Budget, expenseId: string) {
-    await this.findOne(expenseId);
+    return this.dataSource.transaction(async (manager) => {
+      await this.findOne(expenseId);
 
-    await this.expensesRepository.delete({ id: expenseId });
+      await manager.delete(Expense, { id: expenseId });
+      await this.recalculateSpent(budget.id, manager);
 
-    await this.recalculateSpent(budget.id);
-
-    return { message: 'Gasto eliminado' };
+      return { message: 'Gasto eliminado' };
+    });
   }
 
-  private async recalculateSpent(budgetId: string): Promise<void> {
-    const totalSpent = await this.expensesRepository
+  private async recalculateSpent(
+    budgetId: string,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const repo = manager
+      ? manager.getRepository(Expense)
+      : this.expensesRepository;
+
+    const totalSpent = await repo
       .createQueryBuilder('expense')
       .where('expense.budgetId = :budgetId', { budgetId })
       .select('SUM(expense.amount)', 'sum')
@@ -78,6 +89,10 @@ export class ExpensesService {
     const spentValue =
       totalSpent && totalSpent.sum ? parseFloat(totalSpent.sum) : 0;
 
-    await this.budgetsRepository.update(budgetId, { spent: spentValue });
+    const budgetRepo = manager
+      ? manager.getRepository(Budget)
+      : this.budgetsRepository;
+
+    await budgetRepo.update(budgetId, { spent: spentValue });
   }
 }
