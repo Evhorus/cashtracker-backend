@@ -51,6 +51,20 @@ export class ExpensesService {
     return ExpenseResponseDto.fromEntity(expense);
   }
 
+  /**
+   * Internal method for guards - returns Entity
+   * Use this for internal validation logic
+   */
+  async findOneInternal(id: string) {
+    const expense = await this.expensesRepository.findOneBy({ id });
+
+    if (!expense) {
+      throw new NotFoundException(ERROR_MESSAGES.EXPENSE_NOT_FOUND);
+    }
+
+    return expense; // Returns Entity for internal use
+  }
+
   async update({
     budget,
     expenseId,

@@ -10,7 +10,6 @@ export class ExpenseResponseDto {
   amount: number;
   date: Date;
   description?: string;
-  budgetId: string; // Needed for guard validation
   createdAt: Date;
   updatedAt: Date;
 
@@ -26,7 +25,6 @@ export class ExpenseResponseDto {
       amount: expense.amount,
       date: expense.date,
       description: expense.description,
-      budgetId: expense.budgetId,
       createdAt: expense.createdAt,
       updatedAt: expense.updatedAt,
     };

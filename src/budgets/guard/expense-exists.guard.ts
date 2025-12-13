@@ -9,12 +9,12 @@ import {
 
 import { Request } from 'express';
 import { ExpensesService } from '../services/expenses.service';
-import { ExpenseResponseDto } from '../dto/expense-response.dto';
+import { Expense } from '../entities/expense.entity';
 import { isUUID } from 'class-validator';
 
 declare module 'express' {
   interface Request {
-    expense?: ExpenseResponseDto;
+    expense?: Expense; // Entity for internal guard logic
   }
 }
 
@@ -30,7 +30,7 @@ export class ExpenseExistsGuard implements CanActivate {
       throw new BadRequestException('Invalid UUID format');
     }
 
-    const expense = await this.expensesService.findOne(expenseId);
+    const expense = await this.expensesService.findOneInternal(expenseId);
 
     if (!expense) {
       throw new NotFoundException('Expense not found');
