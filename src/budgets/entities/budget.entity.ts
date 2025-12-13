@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -23,6 +24,7 @@ export class Budget {
   spent: number;
 
   @Column()
+  @Index() // Add index for performance
   userId: string;
 
   @Column({ type: 'text', nullable: true })
