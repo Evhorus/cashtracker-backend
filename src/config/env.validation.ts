@@ -26,7 +26,7 @@ export function validateEnv(): Env {
 
   if (!result.success) {
     console.error('❌ Invalid environment variables:');
-    console.error(JSON.stringify(result.error.format(), null, 2));
+    console.error(JSON.stringify(result.error.flatten().fieldErrors, null, 2));
     console.error(
       '\n💡 Check your .env file and ensure all required variables are set.',
     );
