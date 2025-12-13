@@ -12,7 +12,6 @@ describe('ExpensesService', () => {
   let service: ExpensesService;
   let expensesRepository: jest.Mocked<ExpensesRepository>;
   let budgetsRepository: jest.Mocked<BudgetsRepository>;
-  let dataSource: jest.Mocked<DataSource>;
 
   const mockExpense: Expense = {
     id: 'expense-123',
@@ -54,6 +53,7 @@ describe('ExpensesService', () => {
     };
 
     const mockDataSource = {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
       transaction: jest.fn((callback) => callback({})), // Execute callback immediately
     };
 
@@ -78,7 +78,6 @@ describe('ExpensesService', () => {
     service = module.get<ExpensesService>(ExpensesService);
     expensesRepository = module.get(ExpensesRepository);
     budgetsRepository = module.get(BudgetsRepository);
-    dataSource = module.get(DataSource);
   });
 
   afterEach(() => {

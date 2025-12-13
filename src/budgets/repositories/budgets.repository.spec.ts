@@ -23,6 +23,7 @@ describe('BudgetsRepository', () => {
 
   beforeEach(async () => {
     // Create mock repository
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     mockRepository = {
       findAndCount: jest.fn(),
       createQueryBuilder: jest.fn(),
