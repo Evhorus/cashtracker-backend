@@ -15,7 +15,7 @@ export class CreateBudgetDto {
   @Transform(({ value }) => new NormalizeStringPipe().transform(value))
   name: string;
 
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @IsNotEmpty()
   @IsPositive({ message: 'El monto debe ser mayor a 0' })
   amount: number;
