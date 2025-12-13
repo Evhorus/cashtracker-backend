@@ -42,7 +42,8 @@ export class BudgetsController {
 
   @Get()
   findAll(@CurrentUser('id') userId: string) {
-    return this.budgetsService.findAll(userId);
+    // Use light query for list view (no expenses)
+    return this.budgetsService.findAllLight(userId);
   }
 
   @BudgetExists()

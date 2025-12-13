@@ -25,7 +25,14 @@ export class ExpensesService {
       });
 
       await manager.save(expense);
-      await this.recalculateSpent(budgetId, manager);
+
+      // Incremental update - more efficient than recalculation
+      await manager.increment(
+        Budget,
+        { id: budgetId },
+        'spent',
+        expense.amount,
+      );
 
       return {
         message: 'Gasto creado',
@@ -53,10 +60,17 @@ export class ExpensesService {
     updateExpenseDto: UpdateExpenseDto;
   }) {
     return this.dataSource.transaction(async (manager) => {
-      await this.findOne(expenseId);
+      const oldExpense = await this.findOne(expenseId);
 
       await manager.update(Expense, expenseId, updateExpenseDto);
-      await this.recalculateSpent(budget.id, manager);
+
+      // Calculate difference and update incrementally
+      const newAmount = updateExpenseDto.amount ?? oldExpense.amount;
+      const difference = newAmount - oldExpense.amount;
+
+      if (difference !== 0) {
+        await manager.increment(Budget, { id: budget.id }, 'spent', difference);
+      }
 
       return { message: 'Gasto actualizado' };
     });
@@ -64,36 +78,19 @@ export class ExpensesService {
 
   async remove(budget: Budget, expenseId: string) {
     return this.dataSource.transaction(async (manager) => {
-      await this.findOne(expenseId);
+      const expense = await this.findOne(expenseId);
 
       await manager.delete(Expense, { id: expenseId });
-      await this.recalculateSpent(budget.id, manager);
+
+      // Decrement spent by expense amount
+      await manager.decrement(
+        Budget,
+        { id: budget.id },
+        'spent',
+        expense.amount,
+      );
 
       return { message: 'Gasto eliminado' };
     });
-  }
-
-  private async recalculateSpent(
-    budgetId: string,
-    manager?: EntityManager,
-  ): Promise<void> {
-    const repo = manager
-      ? manager.getRepository(Expense)
-      : this.expensesRepository;
-
-    const totalSpent = await repo
-      .createQueryBuilder('expense')
-      .where('expense.budgetId = :budgetId', { budgetId })
-      .select('SUM(expense.amount)', 'sum')
-      .getRawOne<{ sum: string }>();
-
-    const spentValue =
-      totalSpent && totalSpent.sum ? parseFloat(totalSpent.sum) : 0;
-
-    const budgetRepo = manager
-      ? manager.getRepository(Budget)
-      : this.budgetsRepository;
-
-    await budgetRepo.update(budgetId, { spent: spentValue });
   }
 }

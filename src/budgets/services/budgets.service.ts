@@ -22,11 +22,42 @@ export class BudgetsService {
     };
   }
 
+  /**
+   * Find all budgets without expenses (light query for list view)
+   * More efficient than findAll when expenses are not needed
+   */
+  async findAllLight(userId: string) {
+    const [budgets, count] = await this.budgetsRepository.findAndCount({
+      where: { userId },
+      select: [
+        'id',
+        'name',
+        'amount',
+        'spent',
+        'category',
+        'description',
+        'createdAt',
+        'updatedAt',
+      ],
+      order: { createdAt: 'DESC' },
+    });
+
+    return {
+      count,
+      data: budgets,
+    };
+  }
+
+  /**
+   * Find all budgets with expenses (full query for detail view)
+   * Use this when you need expense data
+   */
   async findAll(userId: string) {
     const [budgets, count] = await this.budgetsRepository
       .createQueryBuilder('budget')
       .leftJoinAndSelect('budget.expenses', 'expense')
       .where('budget.userId = :userId', { userId })
+      .orderBy('budget.createdAt', 'DESC')
       .getManyAndCount();
 
     return {
