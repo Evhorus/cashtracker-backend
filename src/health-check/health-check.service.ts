@@ -1,34 +1,28 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { HttpService } from '@nestjs/axios';
-import { firstValueFrom, timeout, catchError } from 'rxjs';
-import { envs } from 'src/config/envs';
+import { DataSource } from 'typeorm';
 
 @Injectable()
 export class HealthCheckService {
   private readonly logger = new Logger(HealthCheckService.name);
 
-  constructor(private readonly httpService: HttpService) {}
+  constructor(private readonly dataSource: DataSource) {}
 
+  /**
+   * Keep-alive ping to prevent Render from hibernating the server
+   * Runs every 30 seconds to maintain activity
+   */
   @Cron(CronExpression.EVERY_30_SECONDS)
-  async checkHealth() {
+  async keepAlive() {
     try {
-      const response$ = this.httpService
-        .get(`${envs.API_URL}/health-check`)
-        .pipe(
-          timeout(5000), // 5 second timeout
-          catchError((error) => {
-            throw error;
-          }),
-        );
-
-      const response = await firstValueFrom(response$);
-      this.logger.log(`Health check status: ${response.status}`);
+      // Direct DB ping - more efficient than HTTP request
+      await this.dataSource.query('SELECT 1');
+      this.logger.debug('Keep-alive ping successful');
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
-      this.logger.error(`Health check failed: ${errorMessage}`, errorStack);
+      this.logger.error(`Keep-alive ping failed: ${errorMessage}`, errorStack);
     }
   }
 }
