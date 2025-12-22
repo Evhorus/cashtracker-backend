@@ -1,24 +1,41 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
+import { HttpService } from '@nestjs/axios';
+
+import { firstValueFrom } from 'rxjs';
+import { envs } from 'src/config/envs';
 
 @Injectable()
 export class HealthCheckService {
   private readonly logger = new Logger(HealthCheckService.name);
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly httpService: HttpService,
+  ) {}
 
   /**
    * Keep-alive ping to prevent Render from hibernating the server
    * Runs every 5 minutes (Render free tier suspends after ~15 minutes of inactivity)
-   * This reduces DB load while ensuring the server never reaches the suspension threshold
+   * Strategy: DB ping + Self HTTP request to simulate inbound traffic
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async keepAlive() {
     try {
-      // Direct DB ping - more efficient than HTTP request
+      // 1. Database ping - keeps DB connection alive
       await this.dataSource.query('SELECT 1');
-      this.logger.log('✓ Keep-alive ping successful - Server staying active');
+      this.logger.log('✓ Database ping successful');
+
+      // 2. Self HTTP ping - attempt to register as inbound traffic for Render
+
+      await firstValueFrom(
+        this.httpService.get(envs.API_URL, { timeout: 5000 }),
+      );
+
+      this.logger.log(
+        '✓ Self HTTP ping successful - Testing if Render detects this',
+      );
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
