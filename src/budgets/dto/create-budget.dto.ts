@@ -1,4 +1,3 @@
-import { Optional } from '@nestjs/common';
 import { Transform } from 'class-transformer';
 import {
   IsNotEmpty,
@@ -25,8 +24,12 @@ export class CreateBudgetDto {
   @Transform(({ value }) => new NormalizeStringPipe().transform(value))
   description?: string;
 
+  @IsOptional()
   @IsString()
-  @Optional()
-  @Transform(({ value }) => new NormalizeStringPipe().transform(value))
+  @Transform(({ value }) => {
+    // Convert empty strings to undefined for optional fields
+    if (value === '' || value === null) return undefined;
+    return new NormalizeStringPipe().transform(value);
+  })
   category?: string;
 }
