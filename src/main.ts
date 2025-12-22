@@ -35,22 +35,7 @@ async function bootstrap() {
   );
 
   await app.listen(env.PORT);
-  logger.log(`🚀 Application is running on: http://localhost:${env.PORT}/api`);
+  logger.log(`App is running on port ${env.PORT}`);
 }
-
-// Global error handlers to catch crashes
-process.on('unhandledRejection', (reason: Error | any) => {
-  logger.error('❌ UNHANDLED PROMISE REJECTION - Process will exit');
-  logger.error(reason);
-  logger.error(reason?.stack);
-  process.exit(1);
-});
-
-process.on('uncaughtException', (error: Error) => {
-  logger.error('❌ UNCAUGHT EXCEPTION - Process will exit');
-  logger.error(error.message);
-  logger.error(error.stack);
-  process.exit(1);
-});
 
 void bootstrap();
