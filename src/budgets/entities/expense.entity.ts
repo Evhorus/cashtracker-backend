@@ -25,8 +25,10 @@ export class Expense {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  @ManyToOne(() => Budget, (budget) => budget.expenses, { onDelete: 'CASCADE' })
-  budget: Budget;
+  @ManyToOne(() => Budget, (budget) => budget.expenses, {
+    onDelete: 'CASCADE',
+  })
+  budget: Budget | null;
 
   @Column()
   budgetId: string;
