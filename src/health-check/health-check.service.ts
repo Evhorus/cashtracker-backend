@@ -28,7 +28,6 @@ export class HealthCheckService {
       this.logger.log('✓ Database ping successful');
 
       // 2. Self HTTP ping - attempt to register as inbound traffic for Render
-
       const url = `${envs.API_URL}/health-check`;
 
       await firstValueFrom(this.httpService.get(url, { timeout: 5000 }));
