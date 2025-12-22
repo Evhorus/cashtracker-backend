@@ -1,8 +1,10 @@
 import helmet from 'helmet';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { validateEnv } from './config/env.validation';
+
+const logger = new Logger('Bootstrap');
 
 async function bootstrap() {
   // Validate environment variables before starting
@@ -31,7 +33,24 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+
   await app.listen(env.PORT);
-  console.log(`🚀 Application is running on: http://localhost:${env.PORT}/api`);
+  logger.log(`🚀 Application is running on: http://localhost:${env.PORT}/api`);
 }
+
+// Global error handlers to catch crashes
+process.on('unhandledRejection', (reason: Error | any) => {
+  logger.error('❌ UNHANDLED PROMISE REJECTION - Process will exit');
+  logger.error(reason);
+  logger.error(reason?.stack);
+  process.exit(1);
+});
+
+process.on('uncaughtException', (error: Error) => {
+  logger.error('❌ UNCAUGHT EXCEPTION - Process will exit');
+  logger.error(error.message);
+  logger.error(error.stack);
+  process.exit(1);
+});
+
 void bootstrap();
