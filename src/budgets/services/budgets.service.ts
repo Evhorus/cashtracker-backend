@@ -46,7 +46,7 @@ export class BudgetsService {
 
     return {
       count,
-      data: budgets.map(BudgetWithExpensesResponseDto.fromEntity),
+      data: budgets.map((b) => BudgetWithExpensesResponseDto.fromEntity(b)),
     };
   }
 
