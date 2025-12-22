@@ -29,13 +29,11 @@ export class HealthCheckService {
 
       // 2. Self HTTP ping - attempt to register as inbound traffic for Render
 
-      await firstValueFrom(
-        this.httpService.get(envs.API_URL, { timeout: 5000 }),
-      );
+      const url = `${envs.API_URL}/health-check`;
 
-      this.logger.log(
-        '✓ Self HTTP ping successful - Testing if Render detects this',
-      );
+      await firstValueFrom(this.httpService.get(url, { timeout: 5000 }));
+
+      this.logger.log('✓ Self HTTP ping successful');
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
