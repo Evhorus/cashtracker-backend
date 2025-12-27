@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CreateExpenseDto } from '../dto/create-expense.dto';
+import { GetExpensesFilterDto } from '../dto/get-expenses-filter.dto';
 import { Budget } from '../entities/budget.entity';
 import { UpdateExpenseDto } from '../dto/update-expense.dto';
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
@@ -33,6 +34,12 @@ export class ExpensesService {
         message: 'Gasto creado',
       };
     });
+  }
+
+  async findAll(budgetId: string, filters: GetExpensesFilterDto) {
+    const expenses = await this.expensesRepository.findAll(budgetId, filters);
+
+    return expenses.map((expense) => ExpenseResponseDto.fromEntity(expense));
   }
 
   async findOne(id: string) {
