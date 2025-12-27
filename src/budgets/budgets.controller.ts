@@ -9,12 +9,14 @@ import {
   ParseUUIDPipe,
   Req,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { BudgetsService } from './services/budgets.service';
 import { CreateBudgetDto } from './dto/create-budget.dto';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { ExpensesService } from './services/expenses.service';
+import { GetExpensesFilterDto } from './dto/get-expenses-filter.dto';
 import type { Request } from 'express';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
@@ -82,6 +84,15 @@ export class BudgetsController {
       throw new BadRequestException('Check ValidateBudgetExistsMiddleware');
     }
     return this.expensesService.create(budgetId, createExpenseDto);
+  }
+
+  @BudgetExists()
+  @Get(':budgetId/expenses')
+  findAllExpenses(
+    @Param('budgetId') budgetId: string,
+    @Query() filters: GetExpensesFilterDto,
+  ) {
+    return this.expensesService.findAll(budgetId, filters);
   }
 
   @ExpenseExists()
