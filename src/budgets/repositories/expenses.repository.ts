@@ -64,4 +64,52 @@ export class ExpensesRepository {
 
     return result && result.sum ? parseFloat(result.sum) : 0;
   }
+
+  /**
+   * Find all expenses for a budget with filters
+   */
+  async findAll(
+    budgetId: string,
+    filters: {
+      startDate?: string;
+      endDate?: string;
+      search?: string;
+      categoryId?: string;
+      sort?: 'ASC' | 'DESC';
+    },
+  ) {
+    const query = this.repository.createQueryBuilder('expense');
+
+    query.where('expense.budgetId = :budgetId', { budgetId });
+
+    if (filters.startDate) {
+      query.andWhere('expense.date >= :startDate', {
+        startDate: filters.startDate,
+      });
+    }
+
+    if (filters.endDate) {
+      query.andWhere('expense.date <= :endDate', {
+        endDate: filters.endDate,
+      });
+    }
+
+    if (filters.search) {
+      query.andWhere(
+        '(LOWER(expense.name) LIKE LOWER(:search) OR LOWER(expense.description) LIKE LOWER(:search))',
+        { search: `%${filters.search}%` },
+      );
+    }
+
+    if (filters.categoryId) {
+      // Assuming future category relation or column
+      // query.andWhere('expense.categoryId = :categoryId', { categoryId: filters.categoryId });
+    }
+
+    const sortOrder = filters.sort || 'ASC'; // Default to ASC as requested
+    query.orderBy('expense.date', sortOrder);
+    query.addOrderBy('expense.createdAt', 'DESC'); // Secondary sort always DESC (creation order)
+
+    return query.getMany();
+  }
 }
