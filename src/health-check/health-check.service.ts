@@ -1,10 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { DataSource } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
-
+import { DataSource } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
-import { envs } from 'src/config/envs';
 
 @Injectable()
 export class HealthCheckService {
@@ -13,6 +12,7 @@ export class HealthCheckService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -28,7 +28,7 @@ export class HealthCheckService {
       this.logger.log('✓ Database ping successful');
 
       // 2. Self HTTP ping - attempt to register as inbound traffic for Render
-      const url = `${envs.API_URL}/health-check`;
+      const url = `${this.configService.getOrThrow<string>('API_URL')}/health-check`;
 
       await firstValueFrom(this.httpService.get(url, { timeout: 5000 }));
 

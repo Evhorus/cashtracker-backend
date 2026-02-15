@@ -1,12 +1,14 @@
 import { createClerkClient } from '@clerk/backend';
-import { envs } from 'src/config/envs';
+import { Provider } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
-export const ClerkClientProvider = {
+export const ClerkClientProvider: Provider = {
   provide: 'ClerkClient',
-  useFactory: () => {
+  inject: [ConfigService],
+  useFactory: (configService: ConfigService) => {
     return createClerkClient({
-      publishableKey: envs.CLERK_PUBLISHABLE_KEY,
-      secretKey: envs.CLERK_SECRET_KEY,
+      publishableKey: configService.getOrThrow<string>('CLERK_SECRET_KEY'),
+      secretKey: configService.getOrThrow<string>('CLERK_SECRET_KEY'),
     });
   },
 };

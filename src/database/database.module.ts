@@ -1,17 +1,21 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { envs } from '../config/envs';
-import { Budget } from '../budgets/entities/budget.entity';
-import { Expense } from '../budgets/entities/expense.entity';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      url: envs.DATABASE_URL,
-      synchronize: envs.NODE_ENV === 'development',
-      entities: [Budget, Expense],
-      logging: envs.NODE_ENV === 'development',
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        type: 'postgres',
+        url: configService.getOrThrow<string>('DATABASE_URL'),
+        synchronize: configService.get('NODE_ENV') === 'development',
+        autoLoadEntities: true,
+        poolSize: 10,
+        keepConnectionAlive: true,
+        logging: configService.get('NODE_ENV') === 'development',
+      }),
     }),
   ],
 })
