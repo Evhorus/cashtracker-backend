@@ -17,13 +17,13 @@ git clone <URL_DEL_REPOSITORIO>
 cd cashtracker-backend
 ```
 
-2. Instala las dependencias:
+1. Instala las dependencias:
 
 ```bash
 pnpm install
 ```
 
-3. Configura las variables de entorno:
+1. Configura las variables de entorno:
    - Crea un archivo `.env` en la raíz del proyecto (tomar como referencia el `.env.template`)
    - Agrega las variables necesarias
 
@@ -127,8 +127,6 @@ cashtracker-backend/
 │   │   │   └── expenses.service.ts
 │   │   ├── budgets.controller.ts     # Controlador REST
 │   │   └── budgets.module.ts
-│   ├── config/                       # Configuración de la app
-│   │   └── envs.ts                   # Validación de variables de entorno
 │   ├── health-check/                 # Módulo de health check
 │   │   ├── health-check.controller.ts
 │   │   ├── health-check.module.ts
