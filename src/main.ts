@@ -1,30 +1,27 @@
-import helmet from 'helmet';
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
 import { ValidationPipe, Logger } from '@nestjs/common';
-import { validateEnv } from './config/env.validation';
+import { NestFactory } from '@nestjs/core';
+import helmet from 'helmet';
 
-const logger = new Logger('Bootstrap');
+import { AppModule } from './app.module';
+
+const logger = new Logger('CashTrackerApp');
 
 async function bootstrap() {
-  // Validate environment variables before starting
-  const env = validateEnv();
-
   const app = await NestFactory.create(AppModule);
+
+  // Global prefix
+  app.setGlobalPrefix('api');
 
   // Security
   app.use(helmet());
 
   // CORS - Allow Next.js frontend
   app.enableCors({
-    origin: env.CLIENT_URL,
+    origin: process.env.CLIENT_URL,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
-
-  // Global prefix
-  app.setGlobalPrefix('api');
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -34,8 +31,10 @@ async function bootstrap() {
     }),
   );
 
-  await app.listen(env.PORT);
-  logger.log(`App is running on port ${env.PORT}`);
+  const port = process.env.PORT || 3000;
+
+  await app.listen(port);
+  logger.log(`App is running on port ${port}`);
 }
 
 void bootstrap();
