@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
-import { DataSource } from 'typeorm';
+// import { DataSource } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable()
@@ -10,7 +10,7 @@ export class HealthCheckService {
   private readonly logger = new Logger(HealthCheckService.name);
 
   constructor(
-    private readonly dataSource: DataSource,
+    // private readonly dataSource: DataSource,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {}
@@ -24,8 +24,9 @@ export class HealthCheckService {
   async keepAlive() {
     try {
       // 1. Database ping - keeps DB connection alive
-      await this.dataSource.query('SELECT 1');
-      this.logger.log('✓ Database ping successful');
+
+      // await this.dataSource.query('SELECT 1');
+      // this.logger.log('✓ Database ping successful');
 
       // 2. Self HTTP ping - attempt to register as inbound traffic for Render
       const url = `${this.configService.getOrThrow<string>('API_URL')}/health-check`;
