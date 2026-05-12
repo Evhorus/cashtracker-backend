@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Budget } from '../entities/budget.entity';
 
 /**
@@ -68,36 +68,45 @@ export class BudgetsRepository {
   /**
    * Create a new budget
    */
-  async create(budgetData: Partial<Budget>) {
-    const budget = this.repository.create(budgetData);
-    return this.repository.save(budget);
+  async create(budgetData: Partial<Budget>, manager?: EntityManager) {
+    const repo = manager ? manager.getRepository(Budget) : this.repository;
+    const budget = repo.create(budgetData);
+    return repo.save(budget);
   }
 
   /**
    * Update a budget
    */
-  async update(id: string, budgetData: Partial<Budget>) {
-    return this.repository.update(id, budgetData);
+  async update(
+    id: string,
+    budgetData: Partial<Budget>,
+    manager?: EntityManager,
+  ) {
+    const repo = manager ? manager.getRepository(Budget) : this.repository;
+    return repo.update(id, budgetData);
   }
 
   /**
    * Remove a budget
    */
-  async remove(budget: Budget) {
-    return this.repository.remove(budget);
+  async remove(budget: Budget, manager?: EntityManager) {
+    const repo = manager ? manager.getRepository(Budget) : this.repository;
+    return repo.remove(budget);
   }
 
   /**
    * Increment spent amount
    */
-  async incrementSpent(id: string, amount: number) {
-    return this.repository.increment({ id }, 'spent', amount);
+  async incrementSpent(id: string, amount: number, manager?: EntityManager) {
+    const repo = manager ? manager.getRepository(Budget) : this.repository;
+    return repo.increment({ id }, 'spent', amount);
   }
 
   /**
    * Decrement spent amount
    */
-  async decrementSpent(id: string, amount: number) {
-    return this.repository.decrement({ id }, 'spent', amount);
+  async decrementSpent(id: string, amount: number, manager?: EntityManager) {
+    const repo = manager ? manager.getRepository(Budget) : this.repository;
+    return repo.decrement({ id }, 'spent', amount);
   }
 }

@@ -1,22 +1,19 @@
 import { Request } from 'express';
 import { ConfigService } from '@nestjs/config';
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { User, verifyToken, type ClerkClient } from '@clerk/backend';
+import { verifyToken } from '@clerk/backend';
 import { Strategy } from 'passport-custom';
 
 @Injectable()
 export class ClerkStrategy extends PassportStrategy(Strategy, 'clerk') {
-  constructor(
-    private readonly configService: ConfigService,
+  private readonly logger = new Logger(ClerkStrategy.name);
 
-    @Inject('ClerkClient')
-    private readonly clerkClient: ClerkClient,
-  ) {
+  constructor(private readonly configService: ConfigService) {
     super();
   }
 
-  async validate(req: Request): Promise<User> {
+  async validate(req: Request): Promise<any> {
     const token = req.headers.authorization?.split(' ').pop();
 
     if (!token) {
@@ -24,15 +21,20 @@ export class ClerkStrategy extends PassportStrategy(Strategy, 'clerk') {
     }
 
     try {
-      const tokenPayload = await verifyToken(token, {
+      const payload = await verifyToken(token, {
         secretKey: this.configService.getOrThrow<string>('CLERK_SECRET_KEY'),
       });
 
-      const user = await this.clerkClient.users.getUser(tokenPayload.sub);
-
-      return user;
+      // Return the payload which contains 'sub' (userId) and other claims.
+      // This avoids a network call to Clerk on every request.
+      return {
+        id: payload.sub,
+        ...payload,
+      };
     } catch (error) {
-      console.error(error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Invalid Clerk token: ${errorMessage}`);
       throw new UnauthorizedException('Invalid token');
     }
   }

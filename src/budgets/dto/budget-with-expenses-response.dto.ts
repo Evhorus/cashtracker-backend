@@ -1,5 +1,5 @@
 import { Budget } from '../entities/budget.entity';
-import { ExpenseResponseDto } from './expense-response.dto';
+import { ExpenseResponseDto } from '../../expenses/dto/expense-response.dto';
 
 /**
  * Response DTO for Budget with expenses
