@@ -10,9 +10,10 @@ import { ClerkAuthGuard } from './guards/clerk-auth.guard';
   providers: [
     ClerkStrategy,
     ClerkClientProvider,
+    ClerkAuthGuard,
     {
       provide: APP_GUARD,
-      useClass: ClerkAuthGuard,
+      useExisting: ClerkAuthGuard,
     },
   ],
   exports: [PassportModule],
