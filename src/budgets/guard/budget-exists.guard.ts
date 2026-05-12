@@ -6,10 +6,11 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { BudgetsService } from '../services/budgets.service';
+
 import { Request } from 'express';
 import { Budget } from '../entities/budget.entity';
 import { isUUID } from 'class-validator';
+import { BudgetsService } from '../budgets.service';
 
 declare module 'express' {
   interface Request {

@@ -7,11 +7,13 @@ import { HealthCheckModule } from './health-check/health-check.module';
 import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
 import { ConfigModule } from '@nestjs/config';
+import { ExpensesModule } from './expenses/expenses.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: process.env.NODE_ENV === 'test' ? '.env.test' : '.env',
     }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
@@ -22,6 +24,7 @@ import { ConfigModule } from '@nestjs/config';
     ]),
     DatabaseModule,
     BudgetsModule,
+    ExpensesModule,
     HealthCheckModule,
     AuthModule,
   ],

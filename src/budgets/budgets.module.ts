@@ -1,22 +1,15 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { BudgetsService } from './services/budgets.service';
 import { BudgetsController } from './budgets.controller';
 import { Budget } from './entities/budget.entity';
-import { Expense } from './entities/expense.entity';
-import { ExpensesService } from './services/expenses.service';
 import { BudgetsRepository } from './repositories/budgets.repository';
-import { ExpensesRepository } from './repositories/expenses.repository';
+import { BudgetsService } from './budgets.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Budget, Expense])],
+  imports: [TypeOrmModule.forFeature([Budget])],
   controllers: [BudgetsController],
-  providers: [
-    BudgetsService,
-    ExpensesService,
-    BudgetsRepository,
-    ExpensesRepository,
-  ],
+  providers: [BudgetsService, BudgetsRepository],
+  exports: [BudgetsService, BudgetsRepository],
 })
 export class BudgetsModule {}
