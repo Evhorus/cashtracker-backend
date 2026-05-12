@@ -6,7 +6,7 @@ import {
   IsPositive,
   IsString,
 } from 'class-validator';
-import { NormalizeStringPipe } from '../pipes/normalize-string.pipe';
+import { NormalizeStringPipe } from 'src/common/pipes/normalize-string.pipe';
 
 export class CreateBudgetDto {
   @IsString()

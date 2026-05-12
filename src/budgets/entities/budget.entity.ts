@@ -7,7 +7,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Expense } from './expense.entity';
+import { Expense } from '../../expenses/entities/expense.entity';
 
 @Entity()
 export class Budget {
