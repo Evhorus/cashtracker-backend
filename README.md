@@ -94,46 +94,59 @@ pnpm run format
 ```
 cashtracker-backend/
 ├── src/
-│   ├── auth/                         # Módulo de autenticación (Clerk)
-│   │   ├── decorators/               # Decoradores personalizados
-│   │   ├── guards/                   # Guards de autenticación
-│   │   ├── providers/                # Proveedores de servicios
-│   │   ├── strategies/               # Estrategias de autenticación
+│   ├── auth/                         # Autenticación con Clerk y Passport
+│   │   ├── decorators/               # @CurrentUser, @Public
+│   │   ├── guards/                   # ClerkAuthGuard
+│   │   ├── providers/                # ClerkClientProvider
+│   │   ├── strategies/               # ClerkStrategy
 │   │   └── auth.module.ts
-│   ├── budgets/                      # Módulo de presupuestos
-│   │   ├── decorators/               # Decoradores de validación
-│   │   ├── dto/                      # Data Transfer Objects
-│   │   ├── entities/                 # Entidades de base de datos
-│   │   ├── guard/                    # Guards de validación
-│   │   ├── repositories/             # Capa de acceso a datos
-│   │   ├── budgets.controller.ts
+│   ├── budgets/                      # Gestión de presupuestos
+│   │   ├── decorators/               # @BudgetExists
+│   │   ├── dto/                      # Create/Update/Response DTOs
+│   │   ├── entities/                 # Entidad Budget (TypeORM)
+│   │   ├── guard/                    # BudgetExistsGuard
+│   │   ├── repositories/             # BudgetsRepository (Data Mapper)
+│   │   ├── budgets.controller.ts     # Rutas de presupuestos
+│   │   ├── budgets.service.ts        # Lógica de negocio
 │   │   └── budgets.module.ts
-│   ├── expenses/                     # Módulo de gastos
-│   │   ├── decorators/               # Decoradores de validación
-│   │   ├── dto/                      # Data Transfer Objects
-│   │   ├── entities/                 # Entidades de base de datos
-│   │   ├── guards/                   # Guards de validación
-│   │   ├── repositories/             # Capa de acceso a datos
-│   │   ├── expenses.controller.ts
+│   ├── expenses/                     # Gestión de gastos
+│   │   ├── decorators/               # @ExpenseExists
+│   │   ├── dto/                      # Create/Update/Response DTOs
+│   │   ├── entities/                 # Entidad Expense (TypeORM)
+│   │   ├── guards/                   # ExpenseExistsGuard
+│   │   ├── repositories/             # ExpensesRepository (Data Mapper)
+│   │   ├── expenses.controller.ts    # Rutas de gastos
+│   │   ├── expenses.service.ts       # Lógica de negocio
 │   │   └── expenses.module.ts
-│   ├── common/                       # Utilidades y componentes compartidos
-│   │   ├── constants/                # Constantes globales
+│   ├── common/                       # Componentes compartidos
+│   │   ├── constants/                # Mensajes de error globales
 │   │   ├── pipes/                    # Pipes de transformación/validación
-│   │   └── utils/                    # Funciones de utilidad
-│   ├── config/                       # Configuración y validación de variables de entorno
-│   ├── database/                     # Configuración de base de datos y migraciones
-│   │   ├── migrations/               # Archivos de migración de TypeORM
+│   │   └── utils/                    # Funciones de utilidad comunes
+│   ├── config/                       # Configuración y validación (Zod)
+│   │   └── env.validation.ts
+│   ├── database/                     # Persistencia de datos
+│   │   ├── migrations/               # Historial de migraciones
+│   │   ├── data-source.ts            # Configuración para TypeORM CLI
 │   │   └── database.module.ts
-│   ├── health-check/                 # Módulo de monitoreo (Health Check)
-│   ├── app.module.ts                 # Módulo principal
-│   └── main.ts                       # Punto de entrada
-├── test/                             # Tests e2e
+│   ├── health-check/                 # Monitoreo de disponibilidad
+│   │   ├── health-check.controller.ts
+│   │   ├── health-check.service.ts
+│   │   └── health-check.module.ts
+│   ├── app.module.ts                 # Ensamblaje de la aplicación
+│   └── main.ts                       # Punto de entrada principal
+├── scripts/                          # Herramientas de desarrollo
+│   ├── migration-master.ts           # Gestor de migraciones
+│   └── typeorm-generate.ts           # Generador de migraciones
+├── test/                             # Pruebas End-to-End (E2E)
 ├── .env.template                     # Plantilla de variables de entorno
-├── .prettierrc                       # Configuración de Prettier
-├── eslint.config.mjs                 # Configuración de ESLint
+├── .gitignore                        # Archivos excluidos de Git
+├── .prettierrc                       # Configuración de formateo (Prettier)
+├── eslint.config.mjs                 # Reglas de linting (ESLint)
 ├── nest-cli.json                     # Configuración del CLI de NestJS
-├── package.json
-└── tsconfig.json                     # Configuración de TypeScript
+├── package.json                      # Scripts y dependencias
+├── pnpm-lock.yaml                    # Versiones exactas de dependencias
+├── tsconfig.build.json               # Configuración de compilación (dist)
+└── tsconfig.json                     # Configuración base de TypeScript
 ```
 
 ## Base de Datos y Migraciones
