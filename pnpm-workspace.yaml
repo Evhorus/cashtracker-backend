@@ -1,4 +1,4 @@
-onlyBuiltDependencies:
-  - '@clerk/shared'
-  - '@nestjs/core'
-  - unrs-resolver
+allowBuilds:
+  '@clerk/shared': true
+  '@nestjs/core': true
+  unrs-resolver: true
