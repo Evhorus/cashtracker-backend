@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   CanActivate,
   ExecutionContext,
   Injectable,
@@ -10,8 +9,8 @@ import {
 import { Request } from 'express';
 
 import { Expense } from '../entities/expense.entity';
-import { isUUID } from 'class-validator';
 import { ExpensesService } from '../expenses.service';
+import { assertIsUUID } from 'src/common/utils/validation.utils';
 
 declare module 'express' {
   interface Request {
@@ -26,14 +25,7 @@ export class ExpenseExistsGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req: Request = context.switchToHttp().getRequest();
     const { expenseId } = req.params;
-
-    if (typeof expenseId !== 'string') {
-      throw new BadRequestException('expenseId must be a string');
-    }
-
-    if (!isUUID(expenseId)) {
-      throw new BadRequestException('Invalid UUID format');
-    }
+    assertIsUUID(expenseId, 'expenseId');
 
     const expense = await this.expensesService.findOneInternal(expenseId);
 
