@@ -8,15 +8,8 @@ import {
 
 import { Request } from 'express';
 
-import { Expense } from '../entities/expense.entity';
 import { ExpensesService } from '../expenses.service';
 import { assertIsUUID } from 'src/common/utils/validation.utils';
-
-declare module 'express' {
-  interface Request {
-    expense?: Expense;
-  }
-}
 
 @Injectable()
 export class ExpenseExistsGuard implements CanActivate {
