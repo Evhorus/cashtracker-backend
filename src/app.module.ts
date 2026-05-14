@@ -21,7 +21,7 @@ import { ExpensesModule } from './expenses/expenses.module';
     ThrottlerModule.forRoot([
       {
         ttl: 60000, // 60 seconds
-        limit: 10, // 10 requests per minute
+        limit: 60, // 60 requests per minute
       },
     ]),
     DatabaseModule,
