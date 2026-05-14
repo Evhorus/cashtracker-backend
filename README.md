@@ -94,56 +94,64 @@ pnpm run format
 ```
 cashtracker-backend/
 ├── src/
-│   ├── auth/                         # Módulo de autenticación
+│   ├── auth/                         # Módulo de autenticación (Clerk)
 │   │   ├── decorators/               # Decoradores personalizados
-│   │   │   ├── current-user.decorator.ts
-│   │   │   └── public.decorator.ts
 │   │   ├── guards/                   # Guards de autenticación
-│   │   │   └── clerk-auth.guard.ts
 │   │   ├── providers/                # Proveedores de servicios
-│   │   │   └── clerk-client.provider.ts
 │   │   ├── strategies/               # Estrategias de autenticación
-│   │   │   └── clerk.strategy.ts
-│   │   ├── types/                    # Tipos de TypeScript
-│   │   │   └── express.d.ts
 │   │   └── auth.module.ts
 │   ├── budgets/                      # Módulo de presupuestos
 │   │   ├── decorators/               # Decoradores de validación
-│   │   │   ├── budget-exists.ts
-│   │   │   └── expense-exists.ts
 │   │   ├── dto/                      # Data Transfer Objects
-│   │   │   ├── create-budget.dto.ts
-│   │   │   ├── create-expense.dto.ts
-│   │   │   ├── update-budget.dto.ts
-│   │   │   └── update-expense.dto.ts
 │   │   ├── entities/                 # Entidades de base de datos
-│   │   │   ├── budget.entity.ts
-│   │   │   └── expense.entity.ts
 │   │   ├── guard/                    # Guards de validación
-│   │   │   ├── budget-exists.guard.ts
-│   │   │   └── expense-exists.guard.ts
-│   │   ├── services/                 # Lógica de negocio
-│   │   │   ├── budgets.service.ts
-│   │   │   └── expenses.service.ts
-│   │   ├── budgets.controller.ts     # Controlador REST
+│   │   ├── repositories/             # Capa de acceso a datos
+│   │   ├── budgets.controller.ts
 │   │   └── budgets.module.ts
-│   ├── health-check/                 # Módulo de health check
-│   │   ├── health-check.controller.ts
-│   │   ├── health-check.module.ts
-│   │   └── health-check.service.ts
+│   ├── expenses/                     # Módulo de gastos
+│   │   ├── decorators/               # Decoradores de validación
+│   │   ├── dto/                      # Data Transfer Objects
+│   │   ├── entities/                 # Entidades de base de datos
+│   │   ├── guards/                   # Guards de validación
+│   │   ├── repositories/             # Capa de acceso a datos
+│   │   ├── expenses.controller.ts
+│   │   └── expenses.module.ts
+│   ├── common/                       # Utilidades y componentes compartidos
+│   │   ├── constants/                # Constantes globales
+│   │   ├── pipes/                    # Pipes de transformación/validación
+│   │   └── utils/                    # Funciones de utilidad
+│   ├── config/                       # Configuración y validación de variables de entorno
+│   ├── database/                     # Configuración de base de datos y migraciones
+│   │   ├── migrations/               # Archivos de migración de TypeORM
+│   │   └── database.module.ts
+│   ├── health-check/                 # Módulo de monitoreo (Health Check)
 │   ├── app.module.ts                 # Módulo principal
-│   ├── main.ts                       # Punto de entrada
-│   └── middleware.ts                 # Middlewares globales
+│   └── main.ts                       # Punto de entrada
 ├── test/                             # Tests e2e
-│   ├── app.e2e-spec.ts
-│   └── jest-e2e.json
 ├── .env.template                     # Plantilla de variables de entorno
 ├── .prettierrc                       # Configuración de Prettier
 ├── eslint.config.mjs                 # Configuración de ESLint
 ├── nest-cli.json                     # Configuración del CLI de NestJS
 ├── package.json
-├── tsconfig.json                     # Configuración de TypeScript
-└── tsconfig.build.json
+└── tsconfig.json                     # Configuración de TypeScript
+```
+
+## Base de Datos y Migraciones
+
+Este proyecto utiliza TypeORM con un flujo basado en migraciones para gestionar el esquema de la base de datos.
+
+```bash
+# Generar una nueva migración basada en los cambios de las entidades
+pnpm migration generate AddNewField
+
+# Ejecutar todas las migraciones pendientes
+pnpm migration run
+
+# Revertir la última migración ejecutada
+pnpm migration revert
+
+# Ver el estado de las migraciones
+pnpm migration show
 ```
 
 ## API Endpoints
@@ -157,12 +165,13 @@ cashtracker-backend/
 - `POST /api/budgets` - Crear un nuevo presupuesto
 - `GET /api/budgets` - Obtener todos los presupuestos del usuario
 - `GET /api/budgets/:budgetId` - Obtener un presupuesto específico
-- `PATCH /api/budgets/:id` - Actualizar un presupuesto
-- `DELETE /api/budgets/:id` - Eliminar un presupuesto
+- `PATCH /api/budgets/:budgetId` - Actualizar un presupuesto
+- `DELETE /api/budgets/:budgetId` - Eliminar un presupuesto
 
 ### Expenses (Gastos)
 
 - `POST /api/budgets/:budgetId/expenses` - Crear un gasto en un presupuesto
+- `GET /api/budgets/:budgetId/expenses` - Obtener todos los gastos de un presupuesto
 - `GET /api/budgets/:budgetId/expenses/:expenseId` - Obtener un gasto específico
 - `PATCH /api/budgets/:budgetId/expenses/:expenseId` - Actualizar un gasto
 - `DELETE /api/budgets/:budgetId/expenses/:expenseId` - Eliminar un gasto
@@ -173,23 +182,21 @@ cashtracker-backend/
 - **Node.js:** Runtime JavaScript
 - **TypeScript:** Lenguaje de programación
 - **Autenticación:** Clerk (@clerk/backend)
-- **Base de datos:** PostgreSQL con TypeORM
+- **Base de Datos:** PostgreSQL con TypeORM
+- **Migraciones:** Gestión de esquema mediante TypeORM CLI
 - **Validación:** class-validator, class-transformer, Zod
-- **Autenticación:** Passport.js
-- **Programación de tareas:** @nestjs/schedule
 - **Testing:** Jest, Supertest
 
 ## Características
 
 - ✅ Autenticación con Clerk
 - ✅ CRUD completo de presupuestos
-- ✅ CRUD completo de gastos asociados a presupuestos
-- ✅ Validación de datos con DTOs
-- ✅ Guards personalizados para validar existencia de recursos
-- ✅ ORM con TypeORM y PostgreSQL
-- ✅ Variables de entorno validadas con Zod
-- ✅ Health check endpoint
-- ✅ Arquitectura modular
+- ✅ CRUD completo de gastos (Módulo independiente)
+- ✅ Validación de datos con DTOs y Zod
+- ✅ Guards personalizados para validación de recursos
+- ✅ Gestión de base de datos mediante migraciones
+- ✅ Health check y monitoreo
+- ✅ Arquitectura modular limpia
 
 ## Recursos
 
