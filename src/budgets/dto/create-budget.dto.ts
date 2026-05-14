@@ -6,12 +6,12 @@ import {
   IsPositive,
   IsString,
 } from 'class-validator';
-import { NormalizeStringPipe } from 'src/common/pipes/normalize-string.pipe';
+import { normalizeString } from 'src/common/utils/string-utils';
 
 export class CreateBudgetDto {
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => new NormalizeStringPipe().transform(value))
+  @Transform(({ value }) => normalizeString(value))
   name: string;
 
   @IsNumber({ maxDecimalPlaces: 2 })
@@ -21,7 +21,7 @@ export class CreateBudgetDto {
 
   @IsOptional()
   @IsString()
-  @Transform(({ value }) => new NormalizeStringPipe().transform(value))
+  @Transform(({ value }) => normalizeString(value))
   description?: string;
 
   @IsOptional()
@@ -29,7 +29,7 @@ export class CreateBudgetDto {
   @Transform(({ value }) => {
     // Convert empty strings to undefined for optional fields
     if (value === '' || value === null) return undefined;
-    return new NormalizeStringPipe().transform(value);
+    return normalizeString(value);
   })
   category?: string;
 }
