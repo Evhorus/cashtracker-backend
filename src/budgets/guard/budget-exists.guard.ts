@@ -7,15 +7,8 @@ import {
 } from '@nestjs/common';
 
 import { Request } from 'express';
-import { Budget } from '../entities/budget.entity';
 import { BudgetsService } from '../budgets.service';
 import { assertIsUUID } from 'src/common/utils/validation.utils';
-
-declare module 'express' {
-  interface Request {
-    budget?: Budget;
-  }
-}
 
 @Injectable()
 export class BudgetExistsGuard implements CanActivate {

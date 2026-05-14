@@ -22,7 +22,7 @@
     "migration": "ts-node scripts/migration-master.ts"
   },
   "dependencies": {
-    "@clerk/backend": "^2.19.0",
+    "@clerk/backend": "^3.4.8",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.3",

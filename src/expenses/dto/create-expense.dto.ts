@@ -7,12 +7,12 @@ import {
   IsPositive,
   IsString,
 } from 'class-validator';
-import { NormalizeStringPipe } from 'src/common/pipes/normalize-string.pipe';
+import { normalizeString } from 'src/common/utils/string-utils';
 
 export class CreateExpenseDto {
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => new NormalizeStringPipe().transform(value))
+  @Transform(({ value }) => normalizeString(value))
   name: string;
 
   @IsNumber({ maxDecimalPlaces: 2 })
@@ -22,7 +22,7 @@ export class CreateExpenseDto {
 
   @IsOptional()
   @IsString()
-  @Transform(({ value }) => new NormalizeStringPipe().transform(value))
+  @Transform(({ value }) => normalizeString(value))
   description?: string;
 
   @IsNotEmpty()
