@@ -25,7 +25,11 @@ export class ExpenseExistsGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req: Request = context.switchToHttp().getRequest();
-    const expenseId = req.params.expenseId;
+    const { expenseId } = req.params;
+
+    if (typeof expenseId !== 'string') {
+      throw new BadRequestException('expenseId must be a string');
+    }
 
     if (!isUUID(expenseId)) {
       throw new BadRequestException('Invalid UUID format');

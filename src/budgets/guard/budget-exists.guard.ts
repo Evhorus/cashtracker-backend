@@ -24,7 +24,11 @@ export class BudgetExistsGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req: Request = context.switchToHttp().getRequest();
-    const budgetId = req.params.budgetId;
+    const { budgetId } = req.params;
+
+    if (typeof budgetId !== 'string') {
+      throw new BadRequestException('budgetId must be a string');
+    }
 
     if (!isUUID(budgetId)) {
       throw new BadRequestException('Invalid UUID format');
