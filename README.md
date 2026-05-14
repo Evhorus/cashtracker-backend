@@ -4,7 +4,7 @@ API REST construida con [NestJS](https://nestjs.org) para la gestión de presupu
 
 ## Requisitos Previos
 
-- Node.js 18.x o superior
+- Node.js 20.x o superior
 - pnpm (recomendado)
 - PostgreSQL
 
