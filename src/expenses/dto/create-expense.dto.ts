@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import {
   IsDateString,
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -8,12 +9,17 @@ import {
   IsString,
 } from 'class-validator';
 import { normalizeString } from 'src/common/utils/string-utils';
+import { Currency } from 'src/common/enums/currency.enum';
 
 export class CreateExpenseDto {
   @IsString()
   @IsNotEmpty()
   @Transform(({ value }) => normalizeString(value))
   name: string;
+
+  @IsEnum(Currency)
+  @IsNotEmpty()
+  currency: Currency;
 
   @IsNumber({ maxDecimalPlaces: 2 })
   @IsNotEmpty()
