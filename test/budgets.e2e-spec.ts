@@ -66,6 +66,7 @@ describe('Budgets (e2e)', () => {
         .send({
           name: 'Groceries',
           amount: 500,
+          currency: 'COP',
           category: 'Food',
           description: 'Monthly groceries',
         })
@@ -113,6 +114,7 @@ describe('Budgets (e2e)', () => {
       await request(app.getHttpServer()).post('/budgets').send({
         name: 'Groceries',
         amount: 500,
+        currency: 'COP',
         category: 'Food',
       });
 
@@ -134,6 +136,7 @@ describe('Budgets (e2e)', () => {
       await request(app.getHttpServer()).post('/budgets').send({
         name: 'My Budget',
         amount: 1000,
+        currency: 'COP',
       });
 
       return request(app.getHttpServer())
@@ -150,9 +153,9 @@ describe('Budgets (e2e)', () => {
     it('should return budget with expenses', async () => {
       // Create budget
       const createRes = await dataSource.query(
-        `INSERT INTO budget (name, amount, spent, "userId", category) 
-         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        ['Groceries', 500, 0, mockUser.id, 'Food'],
+        `INSERT INTO budget (name, amount, spent, "userId", category, currency)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+        ['Groceries', 500, 0, mockUser.id, 'Food', 'COP'],
       );
       const budgetId = createRes[0].id;
 
@@ -183,9 +186,9 @@ describe('Budgets (e2e)', () => {
     it('should update budget', async () => {
       // Create budget
       const createRes = await dataSource.query(
-        `INSERT INTO budget (name, amount, spent, "userId") 
-         VALUES ($1, $2, $3, $4) RETURNING id`,
-        ['Old Name', 500, 0, mockUser.id],
+        `INSERT INTO budget (name, amount, spent, "userId", currency)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        ['Old Name', 500, 0, mockUser.id, 'COP'],
       );
       const budgetId = createRes[0].id;
 
@@ -203,16 +206,16 @@ describe('Budgets (e2e)', () => {
     it('should delete budget and cascade expenses', async () => {
       // Create budget with expense
       const budgetRes = await dataSource.query(
-        `INSERT INTO budget (name, amount, spent, "userId") 
-         VALUES ($1, $2, $3, $4) RETURNING id`,
-        ['To Delete', 500, 50, mockUser.id],
+        `INSERT INTO budget (name, amount, spent, "userId", currency)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        ['To Delete', 500, 50, mockUser.id, 'COP'],
       );
       const budgetId = budgetRes[0].id;
 
       await dataSource.query(
-        `INSERT INTO expense (name, amount, date, "budgetId") 
-         VALUES ($1, $2, $3, $4)`,
-        ['Expense', 50, new Date(), budgetId],
+        `INSERT INTO expense (name, amount, date, "budgetId", currency)
+         VALUES ($1, $2, $3, $4, $5)`,
+        ['Expense', 50, new Date(), budgetId, 'COP'],
       );
 
       // Delete budget

@@ -19,6 +19,7 @@ describe('ExpensesService', () => {
     id: 'budget-123',
     name: 'Groceries',
     amount: 500,
+    currency: 'COP',
     spent: 0,
     userId: 'user-123',
     expenses: [],
@@ -30,6 +31,7 @@ describe('ExpensesService', () => {
     id: 'expense-123',
     name: 'Milk',
     amount: 10,
+    currency: 'COP',
     date: new Date(),
     budgetId: 'budget-123',
     budget: mockBudget,
@@ -80,7 +82,12 @@ describe('ExpensesService', () => {
 
   describe('create', () => {
     it('should create an expense and increment budget spent', async () => {
-      const createDto = { name: 'Milk', amount: 10, date: new Date() };
+      const createDto = {
+        name: 'Milk',
+        amount: 10,
+        currency: 'COP',
+        date: new Date(),
+      };
       expensesRepository.create.mockResolvedValue(mockExpense);
 
       const result = await service.create('budget-123', createDto);

@@ -13,6 +13,7 @@ describe('BudgetsService', () => {
     id: 'budget-123',
     name: 'Groceries',
     amount: 500,
+    currency: 'COP',
     spent: 200,
     userId: 'user-123',
     category: 'Food',
@@ -59,6 +60,7 @@ describe('BudgetsService', () => {
       const createDto = {
         name: 'Groceries',
         amount: 500,
+        currency: 'COP',
         category: 'Food',
         description: 'Monthly groceries',
       };
