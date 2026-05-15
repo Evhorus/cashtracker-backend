@@ -63,6 +63,7 @@ describe('Expenses (e2e)', () => {
         amount: 1000,
         spent: 0,
         userId: mockUser.id,
+        currency: 'COP',
       });
       const budgetId = budget.id;
 
@@ -72,6 +73,7 @@ describe('Expenses (e2e)', () => {
         .send({
           name: 'Coffee',
           amount: 5,
+          currency: 'COP',
           date: new Date().toISOString().split('T')[0],
         })
         .expect(201);
@@ -88,11 +90,17 @@ describe('Expenses (e2e)', () => {
         amount: 1000,
         spent: 0,
         userId: 'other_user_id',
+        currency: 'COP',
       });
 
       await request(app.getHttpServer())
         .post(`/budgets/${budget.id}/expenses`)
-        .send({ name: 'Steal', amount: 100, date: '2024-05-12' })
+        .send({
+          name: 'Steal',
+          amount: 100,
+          currency: 'COP',
+          date: '2024-05-12',
+        })
         .expect(401);
     });
   });
@@ -105,20 +113,23 @@ describe('Expenses (e2e)', () => {
         amount: 1000,
         spent: 0,
         userId: mockUser.id,
+        currency: 'COP',
       });
 
       // Insert 2 expenses manually or via service, but here we use SQL for speed
       await dataSource.query(
-        'INSERT INTO expense (name, amount, date, "budgetId") VALUES ($1, $2, $3, $4), ($5, $6, $7, $8)',
+        'INSERT INTO expense (name, amount, date, "budgetId", currency) VALUES ($1, $2, $3, $4, $5), ($6, $7, $8, $9, $10)',
         [
           'Food',
           10,
           '2024-01-01',
           budget.id,
+          'COP',
           'Tools',
           20,
           '2024-02-01',
           budget.id,
+          'COP',
         ],
       );
 

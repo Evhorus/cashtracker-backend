@@ -17,6 +17,9 @@ export class Budget {
   @Column()
   name: string;
 
+  @Column()
+  currency: string;
+
   @Column({ type: 'decimal' })
   amount: number;
 
