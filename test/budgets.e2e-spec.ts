@@ -66,6 +66,7 @@ describe('Budgets (e2e)', () => {
         .send({
           name: 'Groceries',
           amount: 500,
+          currency: 'COP',
           category: 'Food',
           description: 'Monthly groceries',
         })
@@ -113,6 +114,7 @@ describe('Budgets (e2e)', () => {
       await request(app.getHttpServer()).post('/budgets').send({
         name: 'Groceries',
         amount: 500,
+        currency: 'COP',
         category: 'Food',
       });
 
@@ -134,6 +136,7 @@ describe('Budgets (e2e)', () => {
       await request(app.getHttpServer()).post('/budgets').send({
         name: 'My Budget',
         amount: 1000,
+        currency: 'COP',
       });
 
       return request(app.getHttpServer())
@@ -148,13 +151,16 @@ describe('Budgets (e2e)', () => {
 
   describe('/budgets/:budgetId (GET)', () => {
     it('should return budget with expenses', async () => {
-      // Create budget
-      const createRes = await dataSource.query(
-        `INSERT INTO budget (name, amount, spent, "userId", category) 
-         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        ['Groceries', 500, 0, mockUser.id, 'Food'],
-      );
-      const budgetId = createRes[0].id;
+      // Create budget via API
+      const res = await request(app.getHttpServer())
+        .post('/budgets')
+        .send({
+          name: 'Groceries',
+          amount: 500,
+          currency: 'COP',
+          category: 'Food',
+        });
+      const budgetId = res.body.id || (await dataSource.query('SELECT id FROM budget ORDER BY created_at DESC LIMIT 1'))[0].id;
 
       return request(app.getHttpServer())
         .get(`/budgets/${budgetId}`)
@@ -181,13 +187,15 @@ describe('Budgets (e2e)', () => {
 
   describe('/budgets/:budgetId (PATCH)', () => {
     it('should update budget', async () => {
-      // Create budget
-      const createRes = await dataSource.query(
-        `INSERT INTO budget (name, amount, spent, "userId") 
-         VALUES ($1, $2, $3, $4) RETURNING id`,
-        ['Old Name', 500, 0, mockUser.id],
-      );
-      const budgetId = createRes[0].id;
+      // Create budget via API
+      const res = await request(app.getHttpServer())
+        .post('/budgets')
+        .send({
+          name: 'Old Name',
+          amount: 500,
+          currency: 'COP',
+        });
+      const budgetId = res.body.id || (await dataSource.query('SELECT id FROM budget ORDER BY created_at DESC LIMIT 1'))[0].id;
 
       return request(app.getHttpServer())
         .patch(`/budgets/${budgetId}`)
@@ -201,19 +209,25 @@ describe('Budgets (e2e)', () => {
 
   describe('/budgets/:budgetId (DELETE)', () => {
     it('should delete budget and cascade expenses', async () => {
-      // Create budget with expense
-      const budgetRes = await dataSource.query(
-        `INSERT INTO budget (name, amount, spent, "userId") 
-         VALUES ($1, $2, $3, $4) RETURNING id`,
-        ['To Delete', 500, 50, mockUser.id],
-      );
-      const budgetId = budgetRes[0].id;
+      // Create budget via API
+      const budgetRes = await request(app.getHttpServer())
+        .post('/budgets')
+        .send({
+          name: 'To Delete',
+          amount: 500,
+          currency: 'COP',
+        });
+      const budgetId = budgetRes.body.id || (await dataSource.query('SELECT id FROM budget ORDER BY created_at DESC LIMIT 1'))[0].id;
 
-      await dataSource.query(
-        `INSERT INTO expense (name, amount, date, "budgetId") 
-         VALUES ($1, $2, $3, $4)`,
-        ['Expense', 50, new Date(), budgetId],
-      );
+      // Create expense via API
+      await request(app.getHttpServer())
+        .post(`/budgets/${budgetId}/expenses`)
+        .send({
+          name: 'Expense',
+          amount: 50,
+          currency: 'COP',
+          date: new Date().toISOString().split('T')[0],
+        });
 
       // Delete budget
       await request(app.getHttpServer())
