@@ -12,6 +12,7 @@ describe('BudgetsRepository', () => {
     id: 'budget-123',
     name: 'Groceries',
     amount: 500,
+    currency: 'COP',
     spent: 200,
     userId: 'user-123',
     category: 'Food',
@@ -71,6 +72,7 @@ describe('BudgetsRepository', () => {
           'id',
           'name',
           'amount',
+          'currency',
           'spent',
           'category',
           'description',
@@ -145,6 +147,7 @@ describe('BudgetsRepository', () => {
       const budgetData = {
         name: 'New Budget',
         amount: 1000,
+        currency: 'COP',
         spent: 0,
         userId: 'user-123',
       };

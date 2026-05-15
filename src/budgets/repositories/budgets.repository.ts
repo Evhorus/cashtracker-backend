@@ -25,6 +25,7 @@ export class BudgetsRepository {
         'id',
         'name',
         'amount',
+        'currency',
         'spent',
         'category',
         'description',
