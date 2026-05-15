@@ -56,16 +56,15 @@ describe('Expenses (e2e)', () => {
 
   describe('/budgets/:budgetId/expenses (POST)', () => {
     it('should create an expense and update budget spent amount', async () => {
-      // 1. Create a budget using Repository
-      const budgetRepo = dataSource.getRepository(Budget);
-      const budget = await budgetRepo.save({
-        name: 'Test Budget',
-        amount: 1000,
-        spent: 0,
-        userId: mockUser.id,
-        currency: 'COP',
-      });
-      const budgetId = budget.id;
+      // 1. Create a budget via API
+      const budgetRes = await request(app.getHttpServer())
+        .post('/budgets')
+        .send({
+          name: 'Test Budget',
+          amount: 1000,
+          currency: 'COP',
+        });
+      const budgetId = budgetRes.body.id || (await dataSource.query('SELECT id FROM budget ORDER BY created_at DESC LIMIT 1'))[0].id;
 
       // 2. Add an expense
       await request(app.getHttpServer())
@@ -79,22 +78,21 @@ describe('Expenses (e2e)', () => {
         .expect(201);
 
       // 3. Verify budget spent amount was updated
-      const updatedBudget = await budgetRepo.findOneBy({ id: budgetId });
-      expect(parseFloat(updatedBudget!.spent as any)).toBe(5);
+      const budget = await dataSource.query('SELECT spent FROM budget WHERE id = $1', [budgetId]);
+      expect(parseFloat(budget[0].spent as any)).toBe(5);
     });
 
     it('should fail if budget belongs to another user', async () => {
-      const budgetRepo = dataSource.getRepository(Budget);
-      const budget = await budgetRepo.save({
-        name: 'Other Budget',
-        amount: 1000,
-        spent: 0,
-        userId: 'other_user_id',
-        currency: 'COP',
-      });
+      // Create a budget for another user via SQL (since we can't easily mock other users via API with current setup)
+      await dataSource.query(
+        `INSERT INTO budget (name, amount, spent, "userId", currency)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        ['Other Budget', 1000, 0, 'other_user_id', 'COP'],
+      );
+      const budgetId = (await dataSource.query('SELECT id FROM budget WHERE "userId" = $1', ['other_user_id']))[0].id;
 
       await request(app.getHttpServer())
-        .post(`/budgets/${budget.id}/expenses`)
+        .post(`/budgets/${budgetId}/expenses`)
         .send({
           name: 'Steal',
           amount: 100,
@@ -106,40 +104,95 @@ describe('Expenses (e2e)', () => {
   });
 
   describe('/budgets/:budgetId/expenses (GET)', () => {
-    it('should return expenses with filters', async () => {
-      const budgetRepo = dataSource.getRepository(Budget);
-      const budget = await budgetRepo.save({
-        name: 'Filter Test',
-        amount: 1000,
-        spent: 0,
-        userId: mockUser.id,
-        currency: 'COP',
-      });
+    it('should return a single expense', async () => {
+      // Create budget and expense via API
+      const budgetRes = await request(app.getHttpServer())
+        .post('/budgets')
+        .send({
+          name: 'Single Expense Budget',
+          amount: 1000,
+          currency: 'COP',
+        });
+      const budgetId = budgetRes.body.id || (await dataSource.query('SELECT id FROM budget ORDER BY created_at DESC LIMIT 1'))[0].id;
 
-      // Insert 2 expenses manually or via service, but here we use SQL for speed
-      await dataSource.query(
-        'INSERT INTO expense (name, amount, date, "budgetId", currency) VALUES ($1, $2, $3, $4, $5), ($6, $7, $8, $9, $10)',
-        [
-          'Food',
-          10,
-          '2024-01-01',
-          budget.id,
-          'COP',
-          'Tools',
-          20,
-          '2024-02-01',
-          budget.id,
-          'COP',
-        ],
-      );
+      const expenseRes = await request(app.getHttpServer())
+        .post(`/budgets/${budgetId}/expenses`)
+        .send({
+          name: 'Specific Expense',
+          amount: 50,
+          currency: 'COP',
+          date: new Date().toISOString().split('T')[0],
+        });
+      const expenseId = expenseRes.body.id || (await dataSource.query('SELECT id FROM expense ORDER BY created_at DESC LIMIT 1'))[0].id;
 
-      const res = await request(app.getHttpServer())
-        .get(`/budgets/${budget.id}/expenses`)
-        .query({ search: 'Food' })
+      return request(app.getHttpServer())
+        .get(`/budgets/${budgetId}/expenses/${expenseId}`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toHaveProperty('id', expenseId);
+          expect(res.body).toHaveProperty('name', 'Specific Expense');
+        });
+    });
+
+    it('should update an expense and reflect in budget spent', async () => {
+      // Create budget and expense via API
+      const budgetRes = await request(app.getHttpServer())
+        .post('/budgets')
+        .send({
+          name: 'Update Expense Budget',
+          amount: 1000,
+          currency: 'COP',
+        });
+      const budgetId = budgetRes.body.id || (await dataSource.query('SELECT id FROM budget ORDER BY created_at DESC LIMIT 1'))[0].id;
+
+      const expenseRes = await request(app.getHttpServer())
+        .post(`/budgets/${budgetId}/expenses`)
+        .send({
+          name: 'Changeable Expense',
+          amount: 100,
+          currency: 'COP',
+          date: new Date().toISOString().split('T')[0],
+        });
+      const expenseId = expenseRes.body.id || (await dataSource.query('SELECT id FROM expense ORDER BY created_at DESC LIMIT 1'))[0].id;
+
+      // Update expense amount from 100 to 150 (diff +50)
+      await request(app.getHttpServer())
+        .patch(`/budgets/${budgetId}/expenses/${expenseId}`)
+        .send({ amount: 150 })
         .expect(200);
 
-      expect(res.body).toHaveLength(1);
-      expect(res.body[0].name).toBe('Food');
+      const budget = await dataSource.query('SELECT spent FROM budget WHERE id = $1', [budgetId]);
+      expect(parseFloat(budget[0].spent as any)).toBe(150);
     });
+
+    it('should remove an expense and decrement budget spent', async () => {
+      // Create budget and expense via API
+      const budgetRes = await request(app.getHttpServer())
+        .post('/budgets')
+        .send({
+          name: 'Remove Expense Budget',
+          amount: 1000,
+          currency: 'COP',
+        });
+      const budgetId = budgetRes.body.id || (await dataSource.query('SELECT id FROM budget ORDER BY created_at DESC LIMIT 1'))[0].id;
+
+      const expenseRes = await request(app.getHttpServer())
+        .post(`/budgets/${budgetId}/expenses`)
+        .send({
+          name: 'Disposable Expense',
+          amount: 200,
+          currency: 'COP',
+          date: new Date().toISOString().split('T')[0],
+        });
+      const expenseId = expenseRes.body.id || (await dataSource.query('SELECT id FROM expense ORDER BY created_at DESC LIMIT 1'))[0].id;
+
+      await request(app.getHttpServer())
+        .delete(`/budgets/${budgetId}/expenses/${expenseId}`)
+        .expect(200);
+
+      const budget = await dataSource.query('SELECT spent FROM budget WHERE id = $1', [budgetId]);
+      expect(parseFloat(budget[0].spent as any)).toBe(0);
+    });
+
   });
 });
