@@ -1,13 +1,13 @@
-import { User } from '@clerk/backend';
 import {
   createParamDecorator,
   InternalServerErrorException,
   type ExecutionContext,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { AuthUser } from '../types/auth-user.type';
 
 export const CurrentUser = createParamDecorator(
-  (data: keyof User, ctx: ExecutionContext) => {
+  (data: keyof AuthUser, ctx: ExecutionContext) => {
     const request: Request = ctx.switchToHttp().getRequest();
 
     const user = request?.user;

@@ -72,7 +72,7 @@ describe('Envelopes (e2e)', () => {
         })
         .expect(201)
         .expect((res) => {
-          expect(res.body).toHaveProperty('message', 'Presupuesto creado');
+          expect(res.body).toHaveProperty('message', 'Sobre creado');
         });
     });
 
@@ -105,7 +105,7 @@ describe('Envelopes (e2e)', () => {
         })
         .expect(201)
         .expect((res) => {
-          expect(res.body).toHaveProperty('message', 'Presupuesto creado');
+          expect(res.body).toHaveProperty('message', 'Sobre creado');
         });
     });
 
@@ -119,7 +119,7 @@ describe('Envelopes (e2e)', () => {
         })
         .expect(201)
         .expect((res) => {
-          expect(res.body).toHaveProperty('message', 'Presupuesto creado');
+          expect(res.body).toHaveProperty('message', 'Sobre creado');
         });
     });
   });
@@ -130,9 +130,9 @@ describe('Envelopes (e2e)', () => {
         .get('/envelopes')
         .expect(200)
         .expect((res) => {
-          expect(res.body).toHaveProperty('count', 0);
           expect(res.body).toHaveProperty('data');
           expect(res.body.data).toEqual([]);
+          expect(res.body.meta).toHaveProperty('total', 0);
         });
     });
 
@@ -149,7 +149,7 @@ describe('Envelopes (e2e)', () => {
         .get('/envelopes')
         .expect(200)
         .expect((res) => {
-          expect(res.body.count).toBe(1);
+          expect(res.body.meta.total).toBe(1);
           expect(res.body.data).toHaveLength(1);
           expect(res.body.data[0]).toHaveProperty('name', 'Groceries');
           expect(res.body.data[0]).toHaveProperty('currency', 'COP');
@@ -189,7 +189,7 @@ describe('Envelopes (e2e)', () => {
         .get('/envelopes')
         .expect(200)
         .expect((res) => {
-          expect(res.body.count).toBe(1);
+          expect(res.body.meta.total).toBe(1);
           // All envelopes should belong to mockUser
         });
     });
@@ -256,7 +256,7 @@ describe('Envelopes (e2e)', () => {
         .send({ name: 'New Name', amount: 600 })
         .expect(200)
         .expect((res) => {
-          expect(res.body).toHaveProperty('message', 'Presupuesto Actualizado');
+          expect(res.body).toHaveProperty('message', 'Sobre actualizado');
         });
     });
   });

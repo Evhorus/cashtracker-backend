@@ -3,13 +3,13 @@ import {
   ExecutionContext,
   Injectable,
   NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common';
 
 import { Request } from 'express';
 
 import { ExpensesService } from '../expenses.service';
 import { assertIsUUID } from 'src/common/utils/validation.utils';
+import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
 
 @Injectable()
 export class ExpenseExistsGuard implements CanActivate {
@@ -22,15 +22,11 @@ export class ExpenseExistsGuard implements CanActivate {
 
     const expense = await this.expensesService.findOneInternal(expenseId);
 
-    if (!expense) {
-      throw new NotFoundException('Expense not found');
-    }
-
-    // Security check: ensure expense belongs to the envelope being accessed
-    if (expense.envelopeId !== req.envelope?.id) {
-      throw new UnauthorizedException(
-        'This expense does not belong to the current envelope',
-      );
+    // Same response for "doesn't exist" and "belongs to a different
+    // envelope" - ensures a caller can't enumerate other users' expense IDs
+    // by noticing a different status code for each case.
+    if (!expense || expense.envelopeId !== req.envelope?.id) {
+      throw new NotFoundException(ERROR_MESSAGES.EXPENSE_NOT_FOUND);
     }
 
     req.expense = expense;

@@ -18,11 +18,17 @@ require("dotenv").config();
 
 async function main() {
   const dbUrl = new URL(process.env.DATABASE_URL);
-  dbUrl.searchParams.set("sslmode", "verify-full");
+  // Respect an explicit sslmode already in DATABASE_URL; only default to
+  // strict verification when none was given. Mirrors src/database/data-source.ts -
+  // previously this forced verify-full *and* passed rejectUnauthorized:
+  // false, which never took effect (see that file's comment for why) and
+  // just made the actual TLS behavior harder to reason about.
+  if (!dbUrl.searchParams.has("sslmode")) {
+    dbUrl.searchParams.set("sslmode", "verify-full");
+  }
 
   const client = new Client({
     connectionString: dbUrl.toString(),
-    ssl: { rejectUnauthorized: false },
   });
 
   await client.connect();
@@ -59,7 +65,9 @@ async function main() {
   const outDir = path.join(__dirname, "..", "backups");
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const outFile = path.join(outDir, `backup-${timestamp}.json`);
-  writeFileSync(outFile, JSON.stringify(backup, null, 2));
+  // Full row data for every table, in plaintext - restrict to the owner
+  // only rather than leaving it at the default umask-derived permissions.
+  writeFileSync(outFile, JSON.stringify(backup, null, 2), { mode: 0o600 });
 
   console.log(`\nBackup written to ${outFile}`);
 }

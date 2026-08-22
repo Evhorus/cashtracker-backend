@@ -171,7 +171,7 @@ pnpm migration show
 
 ### Health Check
 
-- `GET /api/health` - Verificar estado del servidor
+- `GET /api/health-check` - Verificar estado del servidor
 
 ### Envelopes (Presupuestos)
 

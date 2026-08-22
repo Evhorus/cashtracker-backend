@@ -5,13 +5,16 @@
 
 export const ERROR_MESSAGES = {
   // Envelope errors
+  //
+  // Note: there is deliberately no separate "unauthorized" message. A
+  // caller who doesn't own an envelope/expense gets the same NOT_FOUND
+  // response as one that doesn't exist at all - see EnvelopeExistsGuard /
+  // ExpenseExistsGuard - so a different message here would defeat that.
   ENVELOPE_NOT_FOUND: 'Envelope not found',
-  ENVELOPE_UNAUTHORIZED: 'You do not have access to this envelope',
   ENVELOPE_INVALID_UUID: 'Invalid envelope ID format',
 
   // Expense errors
   EXPENSE_NOT_FOUND: 'Expense not found',
-  EXPENSE_UNAUTHORIZED: 'You do not have access to this expense',
   EXPENSE_INVALID_UUID: 'Invalid expense ID format',
 
   // Validation errors
