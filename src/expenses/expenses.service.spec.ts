@@ -3,20 +3,20 @@ import { NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { ExpensesService } from './expenses.service';
 import { ExpensesRepository } from './repositories/expenses.repository';
-import { BudgetsRepository } from '../budgets/repositories/budgets.repository';
+import { EnvelopesRepository } from '../envelopes/repositories/envelopes.repository';
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
-import { Budget } from '../budgets/entities/budget.entity';
+import { Envelope } from '../envelopes/entities/envelope.entity';
 import { Expense } from './entities/expense.entity';
 
 describe('ExpensesService', () => {
   let service: ExpensesService;
   let expensesRepository: jest.Mocked<ExpensesRepository>;
-  let budgetsRepository: jest.Mocked<BudgetsRepository>;
+  let envelopesRepository: jest.Mocked<EnvelopesRepository>;
   let dataSource: jest.Mocked<DataSource>;
   let entityManager: EntityManager;
 
-  const mockBudget: Budget = {
-    id: 'budget-123',
+  const mockEnvelope: Envelope = {
+    id: 'envelope-123',
     name: 'Groceries',
     amount: 500,
     currency: 'COP',
@@ -33,8 +33,8 @@ describe('ExpensesService', () => {
     amount: 10,
     currency: 'COP',
     date: new Date(),
-    budgetId: 'budget-123',
-    budget: mockBudget,
+    envelopeId: 'envelope-123',
+    envelope: mockEnvelope,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -48,7 +48,7 @@ describe('ExpensesService', () => {
       delete: jest.fn(),
     };
 
-    const mockBudgetsRepo = {
+    const mockEnvelopesRepo = {
       incrementSpent: jest.fn(),
       decrementSpent: jest.fn(),
       findById: jest.fn(),
@@ -68,20 +68,20 @@ describe('ExpensesService', () => {
       providers: [
         ExpensesService,
         { provide: ExpensesRepository, useValue: mockExpensesRepo },
-        { provide: BudgetsRepository, useValue: mockBudgetsRepo },
+        { provide: EnvelopesRepository, useValue: mockEnvelopesRepo },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
 
     service = module.get<ExpensesService>(ExpensesService);
     expensesRepository = module.get(ExpensesRepository);
-    budgetsRepository = module.get(BudgetsRepository);
+    envelopesRepository = module.get(EnvelopesRepository);
     dataSource = module.get(DataSource);
     entityManager = mockEntityManager;
   });
 
   describe('create', () => {
-    it('should create an expense and increment budget spent', async () => {
+    it('should create an expense and increment envelope spent', async () => {
       const createDto = {
         name: 'Milk',
         amount: 10,
@@ -90,16 +90,16 @@ describe('ExpensesService', () => {
       };
       expensesRepository.create.mockResolvedValue(mockExpense);
 
-      const result = await service.create('budget-123', createDto);
+      const result = await service.create('envelope-123', createDto);
 
       expect(result).toEqual({ message: 'Gasto creado' });
       expect(dataSource.transaction).toHaveBeenCalled();
       expect(expensesRepository.create).toHaveBeenCalledWith(
-        { ...createDto, budgetId: 'budget-123' },
+        { ...createDto, envelopeId: 'envelope-123' },
         entityManager,
       );
-      expect(budgetsRepository.incrementSpent).toHaveBeenCalledWith(
-        'budget-123',
+      expect(envelopesRepository.incrementSpent).toHaveBeenCalledWith(
+        'envelope-123',
         10,
         entityManager,
       );
@@ -107,14 +107,14 @@ describe('ExpensesService', () => {
   });
 
   describe('remove', () => {
-    it('should remove an expense and decrement budget spent', async () => {
+    it('should remove an expense and decrement envelope spent', async () => {
       expensesRepository.findById.mockResolvedValue(mockExpense);
 
-      const result = await service.remove(mockBudget, 'expense-123');
+      const result = await service.remove(mockEnvelope, 'expense-123');
 
       expect(result).toEqual({ message: 'Gasto eliminado' });
-      expect(budgetsRepository.decrementSpent).toHaveBeenCalledWith(
-        mockBudget.id,
+      expect(envelopesRepository.decrementSpent).toHaveBeenCalledWith(
+        mockEnvelope.id,
         mockExpense.amount,
         entityManager,
       );
@@ -123,7 +123,9 @@ describe('ExpensesService', () => {
     it('should throw NotFoundException if expense does not exist', async () => {
       expensesRepository.findById.mockResolvedValue(null);
 
-      await expect(service.remove(mockBudget, 'non-existent')).rejects.toThrow(
+      await expect(
+        service.remove(mockEnvelope, 'non-existent'),
+      ).rejects.toThrow(
         new NotFoundException(ERROR_MESSAGES.EXPENSE_NOT_FOUND),
       );
     });
@@ -133,11 +135,14 @@ describe('ExpensesService', () => {
     it('should return mapped expense responses', async () => {
       expensesRepository.findAll.mockResolvedValue([mockExpense]);
 
-      const result = await service.findAll('budget-123', {});
+      const result = await service.findAll('envelope-123', {});
 
       expect(result).toHaveLength(1);
       expect(result[0]).toHaveProperty('id', mockExpense.id);
-      expect(expensesRepository.findAll).toHaveBeenCalledWith('budget-123', {});
+      expect(expensesRepository.findAll).toHaveBeenCalledWith(
+        'envelope-123',
+        {},
+      );
     });
   });
 });

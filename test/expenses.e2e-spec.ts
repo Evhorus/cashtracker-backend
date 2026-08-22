@@ -5,7 +5,6 @@ import { AppModule } from '../src/app.module';
 import { DataSource } from 'typeorm';
 import { ClerkAuthGuard } from '../src/auth/guards/clerk-auth.guard';
 import { ThrottlerGuard } from '@nestjs/throttler';
-import { Budget } from '../src/budgets/entities/budget.entity';
 
 describe('Expenses (e2e)', () => {
   let app: INestApplication;
@@ -51,24 +50,30 @@ describe('Expenses (e2e)', () => {
       return;
     }
     await dataSource.query('DELETE FROM expense');
-    await dataSource.query('DELETE FROM budget');
+    await dataSource.query('DELETE FROM envelope');
   });
 
-  describe('/budgets/:budgetId/expenses (POST)', () => {
-    it('should create an expense and update budget spent amount', async () => {
-      // 1. Create a budget via API
-      const budgetRes = await request(app.getHttpServer())
-        .post('/budgets')
+  describe('/envelopes/:envelopeId/expenses (POST)', () => {
+    it('should create an expense and update envelope spent amount', async () => {
+      // 1. Create an envelope via API
+      const envelopeRes = await request(app.getHttpServer())
+        .post('/envelopes')
         .send({
-          name: 'Test Budget',
+          name: 'Test Envelope',
           amount: 1000,
           currency: 'COP',
         });
-      const budgetId = budgetRes.body.id || (await dataSource.query('SELECT id FROM budget ORDER BY created_at DESC LIMIT 1'))[0].id;
+      const envelopeId =
+        envelopeRes.body.id ||
+        (
+          await dataSource.query(
+            'SELECT id FROM envelope ORDER BY created_at DESC LIMIT 1',
+          )
+        )[0].id;
 
       // 2. Add an expense
       await request(app.getHttpServer())
-        .post(`/budgets/${budgetId}/expenses`)
+        .post(`/envelopes/${envelopeId}/expenses`)
         .send({
           name: 'Coffee',
           amount: 5,
@@ -77,22 +82,29 @@ describe('Expenses (e2e)', () => {
         })
         .expect(201);
 
-      // 3. Verify budget spent amount was updated
-      const budget = await dataSource.query('SELECT spent FROM budget WHERE id = $1', [budgetId]);
-      expect(parseFloat(budget[0].spent as any)).toBe(5);
+      // 3. Verify envelope spent amount was updated
+      const envelope = await dataSource.query(
+        'SELECT spent FROM envelope WHERE id = $1',
+        [envelopeId],
+      );
+      expect(parseFloat(envelope[0].spent)).toBe(5);
     });
 
-    it('should fail if budget belongs to another user', async () => {
-      // Create a budget for another user via SQL (since we can't easily mock other users via API with current setup)
+    it('should fail if envelope belongs to another user', async () => {
+      // Create an envelope for another user via SQL (since we can't easily mock other users via API with current setup)
       await dataSource.query(
-        `INSERT INTO budget (name, amount, spent, "userId", currency)
+        `INSERT INTO envelope (name, amount, spent, "userId", currency)
          VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        ['Other Budget', 1000, 0, 'other_user_id', 'COP'],
+        ['Other Envelope', 1000, 0, 'other_user_id', 'COP'],
       );
-      const budgetId = (await dataSource.query('SELECT id FROM budget WHERE "userId" = $1', ['other_user_id']))[0].id;
+      const envelopeId = (
+        await dataSource.query('SELECT id FROM envelope WHERE "userId" = $1', [
+          'other_user_id',
+        ])
+      )[0].id;
 
       await request(app.getHttpServer())
-        .post(`/budgets/${budgetId}/expenses`)
+        .post(`/envelopes/${envelopeId}/expenses`)
         .send({
           name: 'Steal',
           amount: 100,
@@ -103,30 +115,42 @@ describe('Expenses (e2e)', () => {
     });
   });
 
-  describe('/budgets/:budgetId/expenses (GET)', () => {
+  describe('/envelopes/:envelopeId/expenses (GET)', () => {
     it('should return a single expense', async () => {
-      // Create budget and expense via API
-      const budgetRes = await request(app.getHttpServer())
-        .post('/budgets')
+      // Create envelope and expense via API
+      const envelopeRes = await request(app.getHttpServer())
+        .post('/envelopes')
         .send({
-          name: 'Single Expense Budget',
+          name: 'Single Expense Envelope',
           amount: 1000,
           currency: 'COP',
         });
-      const budgetId = budgetRes.body.id || (await dataSource.query('SELECT id FROM budget ORDER BY created_at DESC LIMIT 1'))[0].id;
+      const envelopeId =
+        envelopeRes.body.id ||
+        (
+          await dataSource.query(
+            'SELECT id FROM envelope ORDER BY created_at DESC LIMIT 1',
+          )
+        )[0].id;
 
       const expenseRes = await request(app.getHttpServer())
-        .post(`/budgets/${budgetId}/expenses`)
+        .post(`/envelopes/${envelopeId}/expenses`)
         .send({
           name: 'Specific Expense',
           amount: 50,
           currency: 'COP',
           date: new Date().toISOString().split('T')[0],
         });
-      const expenseId = expenseRes.body.id || (await dataSource.query('SELECT id FROM expense ORDER BY created_at DESC LIMIT 1'))[0].id;
+      const expenseId =
+        expenseRes.body.id ||
+        (
+          await dataSource.query(
+            'SELECT id FROM expense ORDER BY created_at DESC LIMIT 1',
+          )
+        )[0].id;
 
       return request(app.getHttpServer())
-        .get(`/budgets/${budgetId}/expenses/${expenseId}`)
+        .get(`/envelopes/${envelopeId}/expenses/${expenseId}`)
         .expect(200)
         .expect((res) => {
           expect(res.body).toHaveProperty('id', expenseId);
@@ -134,65 +158,94 @@ describe('Expenses (e2e)', () => {
         });
     });
 
-    it('should update an expense and reflect in budget spent', async () => {
-      // Create budget and expense via API
-      const budgetRes = await request(app.getHttpServer())
-        .post('/budgets')
+    it('should update an expense and reflect in envelope spent', async () => {
+      // Create envelope and expense via API
+      const envelopeRes = await request(app.getHttpServer())
+        .post('/envelopes')
         .send({
-          name: 'Update Expense Budget',
+          name: 'Update Expense Envelope',
           amount: 1000,
           currency: 'COP',
         });
-      const budgetId = budgetRes.body.id || (await dataSource.query('SELECT id FROM budget ORDER BY created_at DESC LIMIT 1'))[0].id;
+      const envelopeId =
+        envelopeRes.body.id ||
+        (
+          await dataSource.query(
+            'SELECT id FROM envelope ORDER BY created_at DESC LIMIT 1',
+          )
+        )[0].id;
 
       const expenseRes = await request(app.getHttpServer())
-        .post(`/budgets/${budgetId}/expenses`)
+        .post(`/envelopes/${envelopeId}/expenses`)
         .send({
           name: 'Changeable Expense',
           amount: 100,
           currency: 'COP',
           date: new Date().toISOString().split('T')[0],
         });
-      const expenseId = expenseRes.body.id || (await dataSource.query('SELECT id FROM expense ORDER BY created_at DESC LIMIT 1'))[0].id;
+      const expenseId =
+        expenseRes.body.id ||
+        (
+          await dataSource.query(
+            'SELECT id FROM expense ORDER BY created_at DESC LIMIT 1',
+          )
+        )[0].id;
 
       // Update expense amount from 100 to 150 (diff +50)
       await request(app.getHttpServer())
-        .patch(`/budgets/${budgetId}/expenses/${expenseId}`)
+        .patch(`/envelopes/${envelopeId}/expenses/${expenseId}`)
         .send({ amount: 150 })
         .expect(200);
 
-      const budget = await dataSource.query('SELECT spent FROM budget WHERE id = $1', [budgetId]);
-      expect(parseFloat(budget[0].spent as any)).toBe(150);
+      const envelope = await dataSource.query(
+        'SELECT spent FROM envelope WHERE id = $1',
+        [envelopeId],
+      );
+      expect(parseFloat(envelope[0].spent)).toBe(150);
     });
 
-    it('should remove an expense and decrement budget spent', async () => {
-      // Create budget and expense via API
-      const budgetRes = await request(app.getHttpServer())
-        .post('/budgets')
+    it('should remove an expense and decrement envelope spent', async () => {
+      // Create envelope and expense via API
+      const envelopeRes = await request(app.getHttpServer())
+        .post('/envelopes')
         .send({
-          name: 'Remove Expense Budget',
+          name: 'Remove Expense Envelope',
           amount: 1000,
           currency: 'COP',
         });
-      const budgetId = budgetRes.body.id || (await dataSource.query('SELECT id FROM budget ORDER BY created_at DESC LIMIT 1'))[0].id;
+      const envelopeId =
+        envelopeRes.body.id ||
+        (
+          await dataSource.query(
+            'SELECT id FROM envelope ORDER BY created_at DESC LIMIT 1',
+          )
+        )[0].id;
 
       const expenseRes = await request(app.getHttpServer())
-        .post(`/budgets/${budgetId}/expenses`)
+        .post(`/envelopes/${envelopeId}/expenses`)
         .send({
           name: 'Disposable Expense',
           amount: 200,
           currency: 'COP',
           date: new Date().toISOString().split('T')[0],
         });
-      const expenseId = expenseRes.body.id || (await dataSource.query('SELECT id FROM expense ORDER BY created_at DESC LIMIT 1'))[0].id;
+      const expenseId =
+        expenseRes.body.id ||
+        (
+          await dataSource.query(
+            'SELECT id FROM expense ORDER BY created_at DESC LIMIT 1',
+          )
+        )[0].id;
 
       await request(app.getHttpServer())
-        .delete(`/budgets/${budgetId}/expenses/${expenseId}`)
+        .delete(`/envelopes/${envelopeId}/expenses/${expenseId}`)
         .expect(200);
 
-      const budget = await dataSource.query('SELECT spent FROM budget WHERE id = $1', [budgetId]);
-      expect(parseFloat(budget[0].spent as any)).toBe(0);
+      const envelope = await dataSource.query(
+        'SELECT spent FROM envelope WHERE id = $1',
+        [envelopeId],
+      );
+      expect(parseFloat(envelope[0].spent)).toBe(0);
     });
-
   });
 });

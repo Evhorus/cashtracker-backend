@@ -6,7 +6,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Budget } from '../../budgets/entities/budget.entity';
+import { Envelope } from '../../envelopes/entities/envelope.entity';
 
 @Entity()
 export class Expense {
@@ -28,13 +28,13 @@ export class Expense {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  @ManyToOne(() => Budget, (budget) => budget.expenses, {
+  @ManyToOne(() => Envelope, (envelope) => envelope.expenses, {
     onDelete: 'CASCADE',
   })
-  budget: Budget | null;
+  envelope: Envelope | null;
 
   @Column()
-  budgetId: string;
+  envelopeId: string;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

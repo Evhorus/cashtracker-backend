@@ -1,15 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { BudgetsRepository } from './budgets.repository';
-import { Budget } from '../entities/budget.entity';
+import { EnvelopesRepository } from './envelopes.repository';
+import { Envelope } from '../entities/envelope.entity';
 
-describe('BudgetsRepository', () => {
-  let repository: BudgetsRepository;
-  let mockRepository: jest.Mocked<Repository<Budget>>;
+describe('EnvelopesRepository', () => {
+  let repository: EnvelopesRepository;
+  let mockRepository: jest.Mocked<Repository<Envelope>>;
 
-  const mockBudget: Budget = {
-    id: 'budget-123',
+  const mockEnvelope: Envelope = {
+    id: 'envelope-123',
     name: 'Groceries',
     amount: 500,
     currency: 'COP',
@@ -40,15 +40,15 @@ describe('BudgetsRepository', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        BudgetsRepository,
+        EnvelopesRepository,
         {
-          provide: getRepositoryToken(Budget),
+          provide: getRepositoryToken(Envelope),
           useValue: mockRepository,
         },
       ],
     }).compile();
 
-    repository = module.get<BudgetsRepository>(BudgetsRepository);
+    repository = module.get<EnvelopesRepository>(EnvelopesRepository);
   });
 
   afterEach(() => {
@@ -56,16 +56,16 @@ describe('BudgetsRepository', () => {
   });
 
   describe('findByUserIdLight', () => {
-    it('should find budgets without expenses', async () => {
+    it('should find envelopes without expenses', async () => {
       // Arrange
       const userId = 'user-123';
-      mockRepository.findAndCount.mockResolvedValue([[mockBudget], 1]);
+      mockRepository.findAndCount.mockResolvedValue([[mockEnvelope], 1]);
 
       // Act
       const result = await repository.findByUserIdLight(userId);
 
       // Assert
-      expect(result).toEqual([[mockBudget], 1]);
+      expect(result).toEqual([[mockEnvelope], 1]);
       expect(mockRepository.findAndCount).toHaveBeenCalledWith({
         where: { userId },
         select: [
@@ -85,14 +85,14 @@ describe('BudgetsRepository', () => {
   });
 
   describe('findByUserIdWithExpenses', () => {
-    it('should find budgets with expenses', async () => {
+    it('should find envelopes with expenses', async () => {
       // Arrange
       const userId = 'user-123';
       const mockQueryBuilder = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([[mockBudget], 1]),
+        getManyAndCount: jest.fn().mockResolvedValue([[mockEnvelope], 1]),
       };
 
       mockRepository.createQueryBuilder.mockReturnValue(
@@ -103,33 +103,33 @@ describe('BudgetsRepository', () => {
       const result = await repository.findByUserIdWithExpenses(userId);
 
       // Assert
-      expect(result).toEqual([[mockBudget], 1]);
+      expect(result).toEqual([[mockEnvelope], 1]);
       expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
-        'budget.expenses',
+        'envelope.expenses',
         'expense',
       );
       expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        'budget.userId = :userId',
+        'envelope.userId = :userId',
         { userId },
       );
     });
   });
 
   describe('findById', () => {
-    it('should find budget by id', async () => {
+    it('should find envelope by id', async () => {
       // Arrange
-      const id = 'budget-123';
-      mockRepository.findOneBy.mockResolvedValue(mockBudget);
+      const id = 'envelope-123';
+      mockRepository.findOneBy.mockResolvedValue(mockEnvelope);
 
       // Act
       const result = await repository.findById(id);
 
       // Assert
-      expect(result).toEqual(mockBudget);
+      expect(result).toEqual(mockEnvelope);
       expect(mockRepository.findOneBy).toHaveBeenCalledWith({ id });
     });
 
-    it('should return null if budget not found', async () => {
+    it('should return null if envelope not found', async () => {
       // Arrange
       mockRepository.findOneBy.mockResolvedValue(null);
 
@@ -142,32 +142,32 @@ describe('BudgetsRepository', () => {
   });
 
   describe('create', () => {
-    it('should create a new budget', async () => {
+    it('should create a new envelope', async () => {
       // Arrange
-      const budgetData = {
-        name: 'New Budget',
+      const envelopeData = {
+        name: 'New Envelope',
         amount: 1000,
         currency: 'COP',
         spent: 0,
         userId: 'user-123',
       };
-      mockRepository.create.mockReturnValue(mockBudget);
-      mockRepository.save.mockResolvedValue(mockBudget);
+      mockRepository.create.mockReturnValue(mockEnvelope);
+      mockRepository.save.mockResolvedValue(mockEnvelope);
 
       // Act
-      const result = await repository.create(budgetData);
+      const result = await repository.create(envelopeData);
 
       // Assert
-      expect(result).toEqual(mockBudget);
-      expect(mockRepository.create).toHaveBeenCalledWith(budgetData);
-      expect(mockRepository.save).toHaveBeenCalledWith(mockBudget);
+      expect(result).toEqual(mockEnvelope);
+      expect(mockRepository.create).toHaveBeenCalledWith(envelopeData);
+      expect(mockRepository.save).toHaveBeenCalledWith(mockEnvelope);
     });
   });
 
   describe('incrementSpent', () => {
     it('should increment spent amount', async () => {
       // Arrange
-      const id = 'budget-123';
+      const id = 'envelope-123';
       const amount = 50;
 
       // Act
@@ -185,7 +185,7 @@ describe('BudgetsRepository', () => {
   describe('decrementSpent', () => {
     it('should decrement spent amount', async () => {
       // Arrange
-      const id = 'budget-123';
+      const id = 'envelope-123';
       const amount = 30;
 
       // Act

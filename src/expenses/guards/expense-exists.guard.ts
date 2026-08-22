@@ -26,10 +26,10 @@ export class ExpenseExistsGuard implements CanActivate {
       throw new NotFoundException('Expense not found');
     }
 
-    // Security check: ensure expense belongs to the budget being accessed
-    if (expense.budgetId !== req.budget?.id) {
+    // Security check: ensure expense belongs to the envelope being accessed
+    if (expense.envelopeId !== req.envelope?.id) {
       throw new UnauthorizedException(
-        'This expense does not belong to the current budget',
+        'This expense does not belong to the current envelope',
       );
     }
 

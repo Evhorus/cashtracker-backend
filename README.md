@@ -100,15 +100,15 @@ cashtracker-backend/
 │   │   ├── providers/                # ClerkClientProvider
 │   │   ├── strategies/               # ClerkStrategy
 │   │   └── auth.module.ts
-│   ├── budgets/                      # Gestión de presupuestos
-│   │   ├── decorators/               # @BudgetExists
+│   ├── envelopes/                      # Gestión de presupuestos
+│   │   ├── decorators/               # @EnvelopeExists
 │   │   ├── dto/                      # Create/Update/Response DTOs
-│   │   ├── entities/                 # Entidad Budget (TypeORM)
-│   │   ├── guard/                    # BudgetExistsGuard
-│   │   ├── repositories/             # BudgetsRepository (Data Mapper)
-│   │   ├── budgets.controller.ts     # Rutas de presupuestos
-│   │   ├── budgets.service.ts        # Lógica de negocio
-│   │   └── budgets.module.ts
+│   │   ├── entities/                 # Entidad Envelope (TypeORM)
+│   │   ├── guard/                    # EnvelopeExistsGuard
+│   │   ├── repositories/             # EnvelopesRepository (Data Mapper)
+│   │   ├── envelopes.controller.ts     # Rutas de presupuestos
+│   │   ├── envelopes.service.ts        # Lógica de negocio
+│   │   └── envelopes.module.ts
 │   ├── expenses/                     # Gestión de gastos
 │   │   ├── decorators/               # @ExpenseExists
 │   │   ├── dto/                      # Create/Update/Response DTOs
@@ -173,21 +173,21 @@ pnpm migration show
 
 - `GET /api/health` - Verificar estado del servidor
 
-### Budgets (Presupuestos)
+### Envelopes (Presupuestos)
 
-- `POST /api/budgets` - Crear un nuevo presupuesto
-- `GET /api/budgets` - Obtener todos los presupuestos del usuario
-- `GET /api/budgets/:budgetId` - Obtener un presupuesto específico
-- `PATCH /api/budgets/:budgetId` - Actualizar un presupuesto
-- `DELETE /api/budgets/:budgetId` - Eliminar un presupuesto
+- `POST /api/envelopes` - Crear un nuevo presupuesto
+- `GET /api/envelopes` - Obtener todos los presupuestos del usuario
+- `GET /api/envelopes/:envelopeId` - Obtener un presupuesto específico
+- `PATCH /api/envelopes/:envelopeId` - Actualizar un presupuesto
+- `DELETE /api/envelopes/:envelopeId` - Eliminar un presupuesto
 
 ### Expenses (Gastos)
 
-- `POST /api/budgets/:budgetId/expenses` - Crear un gasto en un presupuesto
-- `GET /api/budgets/:budgetId/expenses` - Obtener todos los gastos de un presupuesto
-- `GET /api/budgets/:budgetId/expenses/:expenseId` - Obtener un gasto específico
-- `PATCH /api/budgets/:budgetId/expenses/:expenseId` - Actualizar un gasto
-- `DELETE /api/budgets/:budgetId/expenses/:expenseId` - Eliminar un gasto
+- `POST /api/envelopes/:envelopeId/expenses` - Crear un gasto en un presupuesto
+- `GET /api/envelopes/:envelopeId/expenses` - Obtener todos los gastos de un presupuesto
+- `GET /api/envelopes/:envelopeId/expenses/:expenseId` - Obtener un gasto específico
+- `PATCH /api/envelopes/:envelopeId/expenses/:expenseId` - Actualizar un gasto
+- `DELETE /api/envelopes/:envelopeId/expenses/:expenseId` - Eliminar un gasto
 
 ## Tecnologías
 

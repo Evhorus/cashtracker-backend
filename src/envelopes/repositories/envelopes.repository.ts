@@ -1,21 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
-import { Budget } from '../entities/budget.entity';
+import { Envelope } from '../entities/envelope.entity';
 
 /**
- * Custom repository for Budget entity
+ * Custom repository for Envelope entity
  * Encapsulates complex queries and data access logic
  */
 @Injectable()
-export class BudgetsRepository {
+export class EnvelopesRepository {
   constructor(
-    @InjectRepository(Budget)
-    private readonly repository: Repository<Budget>,
+    @InjectRepository(Envelope)
+    private readonly repository: Repository<Envelope>,
   ) {}
 
   /**
-   * Find all budgets for a user without expenses (light query)
+   * Find all envelopes for a user without expenses (light query)
    * Optimized for list views
    */
   async findByUserIdLight(userId: string) {
@@ -37,27 +37,27 @@ export class BudgetsRepository {
   }
 
   /**
-   * Find all budgets for a user with expenses (full query)
+   * Find all envelopes for a user with expenses (full query)
    * Optimized for detail views
    */
   async findByUserIdWithExpenses(userId: string) {
     return this.repository
-      .createQueryBuilder('budget')
-      .leftJoinAndSelect('budget.expenses', 'expense')
-      .where('budget.userId = :userId', { userId })
-      .orderBy('budget.createdAt', 'DESC')
+      .createQueryBuilder('envelope')
+      .leftJoinAndSelect('envelope.expenses', 'expense')
+      .where('envelope.userId = :userId', { userId })
+      .orderBy('envelope.createdAt', 'DESC')
       .getManyAndCount();
   }
 
   /**
-   * Find one budget by ID
+   * Find one envelope by ID
    */
   async findById(id: string) {
     return this.repository.findOneBy({ id });
   }
 
   /**
-   * Find one budget by ID with expenses
+   * Find one envelope by ID with expenses
    */
   async findByIdWithExpenses(id: string) {
     return this.repository.findOne({
@@ -67,39 +67,39 @@ export class BudgetsRepository {
   }
 
   /**
-   * Create a new budget
+   * Create a new envelope
    */
-  async create(budgetData: Partial<Budget>, manager?: EntityManager) {
-    const repo = manager ? manager.getRepository(Budget) : this.repository;
-    const budget = repo.create(budgetData);
-    return repo.save(budget);
+  async create(envelopeData: Partial<Envelope>, manager?: EntityManager) {
+    const repo = manager ? manager.getRepository(Envelope) : this.repository;
+    const envelope = repo.create(envelopeData);
+    return repo.save(envelope);
   }
 
   /**
-   * Update a budget
+   * Update an envelope
    */
   async update(
     id: string,
-    budgetData: Partial<Budget>,
+    envelopeData: Partial<Envelope>,
     manager?: EntityManager,
   ) {
-    const repo = manager ? manager.getRepository(Budget) : this.repository;
-    return repo.update(id, budgetData);
+    const repo = manager ? manager.getRepository(Envelope) : this.repository;
+    return repo.update(id, envelopeData);
   }
 
   /**
-   * Remove a budget
+   * Remove an envelope
    */
-  async remove(budget: Budget, manager?: EntityManager) {
-    const repo = manager ? manager.getRepository(Budget) : this.repository;
-    return repo.remove(budget);
+  async remove(envelope: Envelope, manager?: EntityManager) {
+    const repo = manager ? manager.getRepository(Envelope) : this.repository;
+    return repo.remove(envelope);
   }
 
   /**
    * Increment spent amount
    */
   async incrementSpent(id: string, amount: number, manager?: EntityManager) {
-    const repo = manager ? manager.getRepository(Budget) : this.repository;
+    const repo = manager ? manager.getRepository(Envelope) : this.repository;
     return repo.increment({ id }, 'spent', amount);
   }
 
@@ -107,7 +107,7 @@ export class BudgetsRepository {
    * Decrement spent amount
    */
   async decrementSpent(id: string, amount: number, manager?: EntityManager) {
-    const repo = manager ? manager.getRepository(Budget) : this.repository;
+    const repo = manager ? manager.getRepository(Envelope) : this.repository;
     return repo.decrement({ id }, 'spent', amount);
   }
 }

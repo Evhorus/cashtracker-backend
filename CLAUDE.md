@@ -28,13 +28,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Architecture & Structure
 
 ### High-Level Overview
-The project is a REST API built with NestJS, using PostgreSQL for persistence and Clerk for authentication. It follows a modular architecture where each domain (Budgets, Expenses, Auth) is encapsulated in its own module.
+The project is a REST API built with NestJS, using PostgreSQL for persistence and Clerk for authentication. It follows a modular architecture where each domain (Envelopes, Expenses, Auth) is encapsulated in its own module.
 
 ### Project Structure
 ```text
 src/
 ├── auth/               # Clerk & Passport authentication (guards, strategies, providers)
-├── budgets/           # Budget domain: entities, repositories, controllers, and services
+├── envelopes/           # Envelope domain: entities, repositories, controllers, and services
 ├── expenses/           # Expense domain: entities, repositories, controllers, and services
 ├── common/            # Shared constants and utility functions
 ├── config/            # Environment configuration and Zod validation
@@ -46,8 +46,8 @@ src/
 
 ### Core Modules Detail
 - `src/auth`: Handles authentication using Clerk and Passport. Contains guards (`ClerkAuthGuard`) and decorators (`@CurrentUser`, `@Public`).
-- `src/budgets`: Manages budget lifecycle. Uses a Data Mapper pattern with `BudgetsRepository` and `Budget` entity.
-- `src/expenses`: Manages expense lifecycle. Similar structure to budgets, with `ExpensesRepository` and `Expense` entity.
+- `src/envelopes`: Manages envelope lifecycle. Uses a Data Mapper pattern with `EnvelopesRepository` and `Envelope` entity.
+- `src/expenses`: Manages expense lifecycle. Similar structure to envelopes, with `ExpensesRepository` and `Expense` entity.
 - `src/database`: Centralized TypeORM configuration and migration management.
 - `src/common`: Shared utilities, pipes, and global constants.
 - `src/config`: Environment variable validation using Zod.
@@ -64,7 +64,7 @@ src/
 ### Key Patterns
 - **Data Mapper**: Repositories are used to decouple business logic from the data access layer.
 - **DTOs**: Every request and response is typed using Data Transfer Objects (DTOs) with `class-validator`.
-- **Custom Guards**: Resources are protected using custom guards (e.g., `BudgetExistsGuard`, `ExpenseExistsGuard`) to ensure ownership and existence before processing requests.
+- **Custom Guards**: Resources are protected using custom guards (e.g., `EnvelopeExistsGuard`, `ExpenseExistsGuard`) to ensure ownership and existence before processing requests.
 - **Environment Validation**: Config is validated at startup using Zod to ensure all required variables are present.
 
 ## Development Guidelines

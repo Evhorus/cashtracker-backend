@@ -4,10 +4,10 @@
  */
 
 export const ERROR_MESSAGES = {
-  // Budget errors
-  BUDGET_NOT_FOUND: 'Budget not found',
-  BUDGET_UNAUTHORIZED: 'You do not have access to this budget',
-  BUDGET_INVALID_UUID: 'Invalid budget ID format',
+  // Envelope errors
+  ENVELOPE_NOT_FOUND: 'Envelope not found',
+  ENVELOPE_UNAUTHORIZED: 'You do not have access to this envelope',
+  ENVELOPE_INVALID_UUID: 'Invalid envelope ID format',
 
   // Expense errors
   EXPENSE_NOT_FOUND: 'Expense not found',
