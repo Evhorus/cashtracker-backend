@@ -123,7 +123,28 @@ describe('EnvelopesService', () => {
       expect(result.data).toHaveLength(1);
       expect(result.data[0]).toHaveProperty('id');
       expect(result.data[0]).not.toHaveProperty('userId'); // DTO doesn't expose userId
-      expect(repository.findByUserIdLight).toHaveBeenCalledWith(userId, 1, 20);
+      expect(repository.findByUserIdLight).toHaveBeenCalledWith(
+        userId,
+        1,
+        20,
+        undefined,
+      );
+    });
+
+    it('should pass the search term through to the repository', async () => {
+      // Arrange
+      repository.findByUserIdLight.mockResolvedValue([[mockEnvelope], 1]);
+
+      // Act
+      await service.findAllLight('user-123', 1, 20, 'grocer');
+
+      // Assert
+      expect(repository.findByUserIdLight).toHaveBeenCalledWith(
+        'user-123',
+        1,
+        20,
+        'grocer',
+      );
     });
 
     it('should return empty data when no envelopes found', async () => {

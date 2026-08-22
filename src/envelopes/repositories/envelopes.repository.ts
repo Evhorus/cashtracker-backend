@@ -16,26 +16,45 @@ export class EnvelopesRepository {
 
   /**
    * Find all envelopes for a user without expenses (light query)
-   * Optimized for list views. Paginated (page is 1-indexed).
+   * Optimized for list views. Paginated (page is 1-indexed). `search`
+   * optionally filters by name/category, case-insensitive.
+   *
+   * Uses createQueryBuilder rather than findAndCount's find-options shape -
+   * the same choice ExpensesRepository.findAll makes - since a case-
+   * insensitive OR-across-columns LIKE isn't expressible there.
    */
-  async findByUserIdLight(userId: string, page: number, limit: number) {
-    return this.repository.findAndCount({
-      where: { userId },
-      select: [
-        'id',
-        'name',
-        'amount',
-        'currency',
-        'spent',
-        'category',
-        'description',
-        'createdAt',
-        'updatedAt',
-      ],
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+  async findByUserIdLight(
+    userId: string,
+    page: number,
+    limit: number,
+    search?: string,
+  ) {
+    const query = this.repository
+      .createQueryBuilder('envelope')
+      .where('envelope.userId = :userId', { userId })
+      .select([
+        'envelope.id',
+        'envelope.name',
+        'envelope.amount',
+        'envelope.currency',
+        'envelope.spent',
+        'envelope.category',
+        'envelope.description',
+        'envelope.createdAt',
+        'envelope.updatedAt',
+      ]);
+
+    if (search) {
+      query.andWhere(
+        '(LOWER(envelope.name) LIKE LOWER(:search) OR LOWER(envelope.category) LIKE LOWER(:search))',
+        { search: `%${search}%` },
+      );
+    }
+
+    query.orderBy('envelope.createdAt', 'DESC');
+    query.skip((page - 1) * limit).take(limit);
+
+    return query.getManyAndCount();
   }
 
   /**

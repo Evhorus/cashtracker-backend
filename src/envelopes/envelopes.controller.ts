@@ -13,7 +13,7 @@ import {
 import { CreateEnvelopeDto } from './dto/create-envelope.dto';
 import { UpdateEnvelopeDto } from './dto/update-envelope.dto';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
-import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
+import { GetEnvelopesFilterDto } from './dto/get-envelopes-filter.dto';
 import { EnvelopeExists } from './decorators/envelope-exists.decorator';
 import { EnvelopesService } from './envelopes.service';
 
@@ -32,9 +32,9 @@ export class EnvelopesController {
   @Get()
   findAll(
     @CurrentUser('id') userId: string,
-    @Query() { page, limit }: PaginationQueryDto,
+    @Query() { page, limit, search }: GetEnvelopesFilterDto,
   ) {
-    return this.envelopesService.findAllLight(userId, page, limit);
+    return this.envelopesService.findAllLight(userId, page, limit, search);
   }
 
   @EnvelopeExists()
