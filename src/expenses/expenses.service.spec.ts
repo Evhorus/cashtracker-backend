@@ -132,16 +132,46 @@ describe('ExpensesService', () => {
   });
 
   describe('findAll', () => {
-    it('should return mapped expense responses', async () => {
-      expensesRepository.findAll.mockResolvedValue([mockExpense]);
+    it('should return a paginated list of mapped expense responses', async () => {
+      expensesRepository.findAll.mockResolvedValue([[mockExpense], 1]);
 
-      const result = await service.findAll('envelope-123', {});
+      const result = await service.findAll('envelope-123', {
+        page: 1,
+        limit: 20,
+      });
 
-      expect(result).toHaveLength(1);
-      expect(result[0]).toHaveProperty('id', mockExpense.id);
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0]).toHaveProperty('id', mockExpense.id);
+      expect(result.meta).toEqual({
+        total: 1,
+        page: 1,
+        limit: 20,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      });
       expect(expensesRepository.findAll).toHaveBeenCalledWith(
         'envelope-123',
         {},
+        1,
+        20,
+      );
+    });
+
+    it('should pass filters through without page/limit', async () => {
+      expensesRepository.findAll.mockResolvedValue([[mockExpense], 1]);
+
+      await service.findAll('envelope-123', {
+        page: 2,
+        limit: 10,
+        search: 'milk',
+      });
+
+      expect(expensesRepository.findAll).toHaveBeenCalledWith(
+        'envelope-123',
+        { search: 'milk' },
+        2,
+        10,
       );
     });
   });

@@ -16,9 +16,9 @@ export class EnvelopesRepository {
 
   /**
    * Find all envelopes for a user without expenses (light query)
-   * Optimized for list views
+   * Optimized for list views. Paginated (page is 1-indexed).
    */
-  async findByUserIdLight(userId: string) {
+  async findByUserIdLight(userId: string, page: number, limit: number) {
     return this.repository.findAndCount({
       where: { userId },
       select: [
@@ -33,20 +33,9 @@ export class EnvelopesRepository {
         'updatedAt',
       ],
       order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
-  }
-
-  /**
-   * Find all envelopes for a user with expenses (full query)
-   * Optimized for detail views
-   */
-  async findByUserIdWithExpenses(userId: string) {
-    return this.repository
-      .createQueryBuilder('envelope')
-      .leftJoinAndSelect('envelope.expenses', 'expense')
-      .where('envelope.userId = :userId', { userId })
-      .orderBy('envelope.createdAt', 'DESC')
-      .getManyAndCount();
   }
 
   /**

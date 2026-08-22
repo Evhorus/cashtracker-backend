@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Envelope } from 'src/envelopes/entities/envelope.entity';
 import { EnvelopesRepository } from 'src/envelopes/repositories/envelopes.repository';
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
+import { PaginatedResponseDto } from 'src/common/dto/paginated-response.dto';
 import { DataSource } from 'typeorm';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { ExpenseResponseDto } from './dto/expense-response.dto';
@@ -41,9 +42,20 @@ export class ExpensesService {
   }
 
   async findAll(envelopeId: string, filters: GetExpensesFilterDto) {
-    const expenses = await this.expensesRepository.findAll(envelopeId, filters);
+    const { page, limit, ...rest } = filters;
+    const [expenses, total] = await this.expensesRepository.findAll(
+      envelopeId,
+      rest,
+      page,
+      limit,
+    );
 
-    return expenses.map((expense) => ExpenseResponseDto.fromEntity(expense));
+    return new PaginatedResponseDto(
+      expenses.map((expense) => ExpenseResponseDto.fromEntity(expense)),
+      total,
+      page,
+      limit,
+    );
   }
 
   async findOne(id: string) {

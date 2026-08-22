@@ -7,11 +7,13 @@ import {
   Param,
   Delete,
   ParseUUIDPipe,
+  Query,
 } from '@nestjs/common';
 
 import { CreateEnvelopeDto } from './dto/create-envelope.dto';
 import { UpdateEnvelopeDto } from './dto/update-envelope.dto';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import { EnvelopeExists } from './decorators/envelope-exists.decorator';
 import { EnvelopesService } from './envelopes.service';
 
@@ -28,8 +30,11 @@ export class EnvelopesController {
   }
 
   @Get()
-  findAll(@CurrentUser('id') userId: string) {
-    return this.envelopesService.findAllLight(userId);
+  findAll(
+    @CurrentUser('id') userId: string,
+    @Query() { page, limit }: PaginationQueryDto,
+  ) {
+    return this.envelopesService.findAllLight(userId, page, limit);
   }
 
   @EnvelopeExists()
