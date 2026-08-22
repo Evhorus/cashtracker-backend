@@ -62,18 +62,42 @@ export class DashboardRepository {
   }
 
   /**
-   * Top N envelopes by amount spent, for the summary chart.
+   * Spending grouped by calendar month (of envelope.createdAt), most
+   * recent `limit` months, returned chronologically ascending.
+   *
+   * Grouping by envelope (the previous chart) mixed unrelated axes -
+   * envelopes here are really "one account for one month" (e.g.
+   * "Marzo Rappi", "Marzo Scotiobank"), so a per-envelope chart bounced
+   * between accounts and months with no consistent order. Per-month is
+   * the one grouping that's both meaningful on its own (this app's
+   * envelopes are always period-scoped) and naturally sorts
+   * chronologically - the standard "spending over time" view every
+   * comparable budgeting app leads with.
    */
-  async getTopSpentEnvelopes(
+  async getMonthlySpending(
     userId: string,
     year: number | undefined,
     limit: number,
   ) {
-    return this.withUserAndYear(userId, year)
-      .select(['envelope.name', 'envelope.amount', 'envelope.spent'])
-      .orderBy('envelope.spent', 'DESC')
+    const rows = await this.withUserAndYear(userId, year)
+      .select("TO_CHAR(envelope.createdAt, 'YYYY-MM')", 'month')
+      .addSelect('COALESCE(SUM(envelope.spent), 0)', 'spent')
+      .addSelect(
+        'COALESCE(SUM(CASE WHEN envelope.amount IS NOT NULL THEN GREATEST(envelope.amount - envelope.spent, 0) ELSE 0 END), 0)',
+        'available',
+      )
+      .groupBy("TO_CHAR(envelope.createdAt, 'YYYY-MM')")
+      .orderBy('month', 'DESC')
       .limit(limit)
-      .getMany();
+      .getRawMany<{ month: string; spent: string; available: string }>();
+
+    return rows
+      .map((row) => ({
+        month: row.month,
+        spent: Number(row.spent),
+        available: Number(row.available),
+      }))
+      .reverse();
   }
 
   /**

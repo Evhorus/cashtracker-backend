@@ -2,7 +2,22 @@ import { Injectable } from '@nestjs/common';
 import { DashboardRepository } from './repositories/dashboard.repository';
 import { DashboardSummaryResponseDto } from './dto/dashboard-summary-response.dto';
 
-const CHART_TOP_N = 5;
+const CHART_MONTHS_LIMIT = 12;
+
+const MONTH_LABELS_ES = [
+  'Ene',
+  'Feb',
+  'Mar',
+  'Abr',
+  'May',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dic',
+];
 
 @Injectable()
 export class DashboardService {
@@ -12,28 +27,39 @@ export class DashboardService {
     userId: string,
     year?: number,
   ): Promise<DashboardSummaryResponseDto> {
-    const [aggregate, topEnvelopes, availableYears] = await Promise.all([
+    const [aggregate, monthlySpending, availableYears] = await Promise.all([
       this.dashboardRepository.getSummaryAggregate(userId, year),
-      this.dashboardRepository.getTopSpentEnvelopes(userId, year, CHART_TOP_N),
+      this.dashboardRepository.getMonthlySpending(
+        userId,
+        year,
+        CHART_MONTHS_LIMIT,
+      ),
       this.dashboardRepository.getAvailableYears(userId),
     ]);
+
+    // Only disambiguate the label with a year when the returned range
+    // actually spans more than one - e.g. filtered to a single year, or
+    // all the data happens to fall within one, "Ago" alone reads fine.
+    const spansMultipleYears =
+      new Set(monthlySpending.map((row) => row.month.slice(0, 4))).size > 1;
 
     return {
       totalEnvelopes: aggregate.count,
       totalAssigned: aggregate.totalAssigned,
       totalSpent: aggregate.totalSpent,
       totalAvailable: aggregate.totalAssigned - aggregate.cappedSpent,
-      chart: topEnvelopes.map((envelope) => {
-        const spent = Number(envelope.spent);
-        const amount =
-          envelope.amount === null ? null : Number(envelope.amount);
-        return {
-          name: envelope.name,
-          spent,
-          available: amount === null ? 0 : Math.max(0, amount - spent),
-        };
-      }),
+      chart: monthlySpending.map((row) => ({
+        label: formatMonthLabel(row.month, spansMultipleYears),
+        spent: row.spent,
+        available: row.available,
+      })),
       availableYears,
     };
   }
+}
+
+function formatMonthLabel(monthKey: string, includeYear: boolean): string {
+  const [yearPart, monthPart] = monthKey.split('-');
+  const label = MONTH_LABELS_ES[parseInt(monthPart, 10) - 1] ?? monthKey;
+  return includeYear ? `${label} ${yearPart}` : label;
 }

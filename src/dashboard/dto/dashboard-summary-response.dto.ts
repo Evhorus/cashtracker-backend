@@ -1,10 +1,10 @@
 /**
- * One bar's worth of chart data: how much of an envelope's assigned
- * amount was spent vs. still available. `available` is 0 for envelopes
- * with no spending limit - there's no assigned amount to split against.
+ * One bar's worth of chart data: total spent vs. still available
+ * (summed across capped envelopes only) for one calendar month, e.g.
+ * `label: "Ago 2026"`. Chronologically ascending.
  */
 export class DashboardChartEntryDto {
-  name: string;
+  label: string;
   spent: number;
   available: number;
 }
@@ -27,7 +27,7 @@ export class DashboardSummaryResponseDto {
   /** totalAssigned minus spent, counting only capped envelopes. */
   totalAvailable: number;
 
-  /** Top 5 envelopes by amount spent, for the summary bar chart. */
+  /** Spending by month, most recent months, chronologically ascending. */
   chart: DashboardChartEntryDto[];
 
   /** Distinct years the user has envelopes in, DESC - for a year picker. */
