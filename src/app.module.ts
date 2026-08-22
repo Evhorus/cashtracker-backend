@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
 
 import { ExpensesModule } from './expenses/expenses.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ExpensesModule } from './expenses/expenses.module';
     DatabaseModule,
     EnvelopesModule,
     ExpensesModule,
+    DashboardModule,
     HealthCheckModule,
     AuthModule,
   ],

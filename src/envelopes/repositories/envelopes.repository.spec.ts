@@ -56,13 +56,13 @@ describe('EnvelopesRepository', () => {
   });
 
   describe('findByUserIdLight', () => {
-    it('should find envelopes without expenses', async () => {
+    it('should find a page of envelopes without expenses', async () => {
       // Arrange
       const userId = 'user-123';
       mockRepository.findAndCount.mockResolvedValue([[mockEnvelope], 1]);
 
       // Act
-      const result = await repository.findByUserIdLight(userId);
+      const result = await repository.findByUserIdLight(userId, 1, 20);
 
       // Assert
       expect(result).toEqual([[mockEnvelope], 1]);
@@ -80,37 +80,21 @@ describe('EnvelopesRepository', () => {
           'updatedAt',
         ],
         order: { createdAt: 'DESC' },
+        skip: 0,
+        take: 20,
       });
     });
-  });
 
-  describe('findByUserIdWithExpenses', () => {
-    it('should find envelopes with expenses', async () => {
+    it('should compute the correct offset for page 3', async () => {
       // Arrange
-      const userId = 'user-123';
-      const mockQueryBuilder = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([[mockEnvelope], 1]),
-      };
-
-      mockRepository.createQueryBuilder.mockReturnValue(
-        mockQueryBuilder as any,
-      );
+      mockRepository.findAndCount.mockResolvedValue([[], 0]);
 
       // Act
-      const result = await repository.findByUserIdWithExpenses(userId);
+      await repository.findByUserIdLight('user-123', 3, 20);
 
       // Assert
-      expect(result).toEqual([[mockEnvelope], 1]);
-      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith(
-        'envelope.expenses',
-        'expense',
-      );
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        'envelope.userId = :userId',
-        { userId },
+      expect(mockRepository.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 40, take: 20 }),
       );
     });
   });

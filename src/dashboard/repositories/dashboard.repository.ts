@@ -1,0 +1,93 @@
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Envelope } from '../../envelopes/entities/envelope.entity';
+
+interface SummaryAggregateRow {
+  count: string;
+  totalAssigned: string;
+  totalSpent: string;
+  cappedSpent: string;
+}
+
+/**
+ * Read-only aggregate queries for the dashboard. Kept separate from
+ * EnvelopesRepository (which owns envelope CRUD) - this is reporting,
+ * a different responsibility that may one day need to reach across
+ * entities (e.g. expenses) that plain envelope CRUD never will.
+ */
+@Injectable()
+export class DashboardRepository {
+  constructor(
+    @InjectRepository(Envelope)
+    private readonly repository: Repository<Envelope>,
+  ) {}
+
+  private withUserAndYear(userId: string, year?: number) {
+    const qb = this.repository
+      .createQueryBuilder('envelope')
+      .where('envelope.userId = :userId', { userId });
+
+    if (year) {
+      qb.andWhere('EXTRACT(YEAR FROM envelope.createdAt) = :year', { year });
+    }
+
+    return qb;
+  }
+
+  /**
+   * Single aggregate query: envelope count, sum of assigned amounts
+   * (capped envelopes only), sum of spent (all envelopes), and sum of
+   * spent restricted to capped envelopes (needed to compute
+   * totalAvailable without including unlimited envelopes as if they
+   * had a $0 budget).
+   */
+  async getSummaryAggregate(userId: string, year?: number) {
+    const raw = await this.withUserAndYear(userId, year)
+      .select('COUNT(*)', 'count')
+      .addSelect('COALESCE(SUM(envelope.amount), 0)', 'totalAssigned')
+      .addSelect('COALESCE(SUM(envelope.spent), 0)', 'totalSpent')
+      .addSelect(
+        'COALESCE(SUM(CASE WHEN envelope.amount IS NOT NULL THEN envelope.spent ELSE 0 END), 0)',
+        'cappedSpent',
+      )
+      .getRawOne<SummaryAggregateRow>();
+
+    return {
+      count: Number(raw?.count ?? 0),
+      totalAssigned: Number(raw?.totalAssigned ?? 0),
+      totalSpent: Number(raw?.totalSpent ?? 0),
+      cappedSpent: Number(raw?.cappedSpent ?? 0),
+    };
+  }
+
+  /**
+   * Top N envelopes by amount spent, for the summary chart.
+   */
+  async getTopSpentEnvelopes(
+    userId: string,
+    year: number | undefined,
+    limit: number,
+  ) {
+    return this.withUserAndYear(userId, year)
+      .select(['envelope.name', 'envelope.amount', 'envelope.spent'])
+      .orderBy('envelope.spent', 'DESC')
+      .limit(limit)
+      .getMany();
+  }
+
+  /**
+   * Distinct calendar years the user has envelopes in, most recent
+   * first - powers a year picker on the frontend.
+   */
+  async getAvailableYears(userId: string): Promise<number[]> {
+    const rows = await this.repository
+      .createQueryBuilder('envelope')
+      .select('DISTINCT EXTRACT(YEAR FROM envelope.createdAt)', 'year')
+      .where('envelope.userId = :userId', { userId })
+      .orderBy('year', 'DESC')
+      .getRawMany<{ year: string }>();
+
+    return rows.map((row) => Number(row.year));
+  }
+}

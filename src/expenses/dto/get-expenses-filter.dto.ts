@@ -1,6 +1,7 @@
 import { IsOptional, IsString, IsDateString, IsIn } from 'class-validator';
+import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 
-export class GetExpensesFilterDto {
+export class GetExpensesFilterDto extends PaginationQueryDto {
   @IsOptional()
   @IsDateString()
   startDate?: string;

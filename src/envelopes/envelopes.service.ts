@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
+import { PaginatedResponseDto } from 'src/common/dto/paginated-response.dto';
 import { EnvelopeResponseDto } from './dto/envelope-response.dto';
 import { EnvelopeWithExpensesResponseDto } from './dto/envelope-with-expenses-response.dto';
 import { CreateEnvelopeDto } from './dto/create-envelope.dto';
@@ -18,36 +19,27 @@ export class EnvelopesService {
     });
 
     return {
-      message: 'Presupuesto creado',
+      message: 'Sobre creado',
     };
   }
 
   /**
-   * Find all envelopes without expenses (light query for list view)
-   * More efficient than findAll when expenses are not needed
+   * Find all envelopes without expenses (light query for list view),
+   * paginated (page is 1-indexed).
    */
-  async findAllLight(userId: string) {
-    const [envelopes, count] =
-      await this.envelopesRepository.findByUserIdLight(userId);
+  async findAllLight(userId: string, page: number, limit: number) {
+    const [envelopes, total] = await this.envelopesRepository.findByUserIdLight(
+      userId,
+      page,
+      limit,
+    );
 
-    return {
-      count,
-      data: EnvelopeResponseDto.fromEntities(envelopes),
-    };
-  }
-
-  /**
-   * Find all envelopes with expenses (full query for detail view)
-   * Use this when you need expense data
-   */
-  async findAll(userId: string) {
-    const [envelopes, count] =
-      await this.envelopesRepository.findByUserIdWithExpenses(userId);
-
-    return {
-      count,
-      data: envelopes.map((b) => EnvelopeWithExpensesResponseDto.fromEntity(b)),
-    };
+    return new PaginatedResponseDto(
+      EnvelopeResponseDto.fromEntities(envelopes),
+      total,
+      page,
+      limit,
+    );
   }
 
   async findOne(id: string) {
@@ -74,7 +66,7 @@ export class EnvelopesService {
     await this.findOne(id);
     await this.envelopesRepository.update(id, updateEnvelopeDto);
     return {
-      message: 'Presupuesto Actualizado',
+      message: 'Sobre actualizado',
     };
   }
 

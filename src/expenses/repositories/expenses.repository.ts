@@ -55,6 +55,8 @@ export class ExpensesRepository {
       categoryId?: string;
       sort?: 'ASC' | 'DESC';
     },
+    page: number,
+    limit: number,
   ) {
     const query = this.repository.createQueryBuilder('expense');
 
@@ -82,7 +84,8 @@ export class ExpensesRepository {
     const sortOrder = filters.sort || 'ASC';
     query.orderBy('expense.date', sortOrder);
     query.addOrderBy('expense.createdAt', 'DESC');
+    query.skip((page - 1) * limit).take(limit);
 
-    return query.getMany();
+    return query.getManyAndCount();
   }
 }

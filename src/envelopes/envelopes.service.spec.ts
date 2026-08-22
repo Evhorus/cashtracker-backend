@@ -28,7 +28,6 @@ describe('EnvelopesService', () => {
     const mockRepo = {
       create: jest.fn(),
       findByUserIdLight: jest.fn(),
-      findByUserIdWithExpenses: jest.fn(),
       findById: jest.fn(),
       findByIdWithExpenses: jest.fn(),
       update: jest.fn(),
@@ -70,7 +69,7 @@ describe('EnvelopesService', () => {
       const result = await service.create(userId, createDto);
 
       // Assert
-      expect(result).toEqual({ message: 'Presupuesto creado' });
+      expect(result).toEqual({ message: 'Sobre creado' });
       expect(repository.create).toHaveBeenCalledWith({
         ...createDto,
         spent: 0,
@@ -94,7 +93,7 @@ describe('EnvelopesService', () => {
       const result = await service.create(userId, createDto);
 
       // Assert
-      expect(result).toEqual({ message: 'Presupuesto creado' });
+      expect(result).toEqual({ message: 'Sobre creado' });
       expect(repository.create).toHaveBeenCalledWith({
         ...createDto,
         spent: 0,
@@ -104,52 +103,57 @@ describe('EnvelopesService', () => {
   });
 
   describe('findAllLight', () => {
-    it('should return envelopes without expenses', async () => {
+    it('should return a paginated list of envelopes without expenses', async () => {
       // Arrange
       const userId = 'user-123';
       repository.findByUserIdLight.mockResolvedValue([[mockEnvelope], 1]);
 
       // Act
-      const result = await service.findAllLight(userId);
+      const result = await service.findAllLight(userId, 1, 20);
 
       // Assert
-      expect(result.count).toBe(1);
+      expect(result.meta).toEqual({
+        total: 1,
+        page: 1,
+        limit: 20,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      });
       expect(result.data).toHaveLength(1);
       expect(result.data[0]).toHaveProperty('id');
       expect(result.data[0]).not.toHaveProperty('userId'); // DTO doesn't expose userId
-      expect(repository.findByUserIdLight).toHaveBeenCalledWith(userId);
+      expect(repository.findByUserIdLight).toHaveBeenCalledWith(userId, 1, 20);
     });
 
-    it('should return empty array when no envelopes found', async () => {
+    it('should return empty data when no envelopes found', async () => {
       // Arrange
       repository.findByUserIdLight.mockResolvedValue([[], 0]);
 
       // Act
-      const result = await service.findAllLight('user-123');
+      const result = await service.findAllLight('user-123', 1, 20);
 
       // Assert
-      expect(result.count).toBe(0);
+      expect(result.meta.total).toBe(0);
       expect(result.data).toEqual([]);
     });
-  });
 
-  describe('findAll', () => {
-    it('should return envelopes with expenses', async () => {
+    it('should compute pagination meta correctly for a middle page', async () => {
       // Arrange
-      const userId = 'user-123';
-      const envelopeWithExpenses = { ...mockEnvelope, expenses: [] };
-      repository.findByUserIdWithExpenses.mockResolvedValue([
-        [envelopeWithExpenses],
-        1,
-      ]);
+      repository.findByUserIdLight.mockResolvedValue([[mockEnvelope], 45]);
 
       // Act
-      const result = await service.findAll(userId);
+      const result = await service.findAllLight('user-123', 2, 20);
 
       // Assert
-      expect(result.count).toBe(1);
-      expect(result.data).toHaveLength(1);
-      expect(repository.findByUserIdWithExpenses).toHaveBeenCalledWith(userId);
+      expect(result.meta).toEqual({
+        total: 45,
+        page: 2,
+        limit: 20,
+        totalPages: 3,
+        hasNextPage: true,
+        hasPreviousPage: true,
+      });
     });
   });
 
@@ -220,7 +224,7 @@ describe('EnvelopesService', () => {
       const result = await service.update('envelope-123', updateDto);
 
       // Assert
-      expect(result).toEqual({ message: 'Presupuesto Actualizado' });
+      expect(result).toEqual({ message: 'Sobre actualizado' });
       expect(repository.findById).toHaveBeenCalledWith('envelope-123');
       expect(repository.update).toHaveBeenCalledWith('envelope-123', updateDto);
     });
