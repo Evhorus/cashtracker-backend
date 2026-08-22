@@ -34,12 +34,12 @@ export class ExpensesRepository {
     return repo.delete({ id });
   }
 
-  async calculateTotalSpent(budgetId: string, manager?: EntityManager) {
+  async calculateTotalSpent(envelopeId: string, manager?: EntityManager) {
     const repo = manager ? manager.getRepository(Expense) : this.repository;
 
     const result = await repo
       .createQueryBuilder('expense')
-      .where('expense.budgetId = :budgetId', { budgetId })
+      .where('expense.envelopeId = :envelopeId', { envelopeId })
       .select('SUM(expense.amount)', 'sum')
       .getRawOne<{ sum: string }>();
 
@@ -47,7 +47,7 @@ export class ExpensesRepository {
   }
 
   async findAll(
-    budgetId: string,
+    envelopeId: string,
     filters: {
       startDate?: string;
       endDate?: string;
@@ -58,7 +58,7 @@ export class ExpensesRepository {
   ) {
     const query = this.repository.createQueryBuilder('expense');
 
-    query.where('expense.budgetId = :budgetId', { budgetId });
+    query.where('expense.envelopeId = :envelopeId', { envelopeId });
 
     if (filters.startDate) {
       query.andWhere('expense.date >= :startDate', {

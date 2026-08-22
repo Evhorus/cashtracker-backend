@@ -10,7 +10,7 @@ import {
 import { Expense } from '../../expenses/entities/expense.entity';
 
 @Entity()
-export class Budget {
+export class Envelope {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -20,8 +20,8 @@ export class Budget {
   @Column()
   currency: string;
 
-  @Column({ type: 'decimal' })
-  amount: number;
+  @Column({ type: 'decimal', nullable: true })
+  amount: number | null;
 
   @Column({ type: 'decimal' })
   spent: number;
@@ -36,7 +36,7 @@ export class Budget {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  @OneToMany(() => Expense, (expense) => expense.budget, {
+  @OneToMany(() => Expense, (expense) => expense.envelope, {
     cascade: true,
   })
   expenses: Expense[];

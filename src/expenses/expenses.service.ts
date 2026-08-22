@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Budget } from 'src/budgets/entities/budget.entity';
-import { BudgetsRepository } from 'src/budgets/repositories/budgets.repository';
+import { Envelope } from 'src/envelopes/entities/envelope.entity';
+import { EnvelopesRepository } from 'src/envelopes/repositories/envelopes.repository';
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
 import { DataSource } from 'typeorm';
 import { CreateExpenseDto } from './dto/create-expense.dto';
@@ -13,23 +13,23 @@ import { ExpensesRepository } from './repositories/expenses.repository';
 export class ExpensesService {
   constructor(
     private readonly expensesRepository: ExpensesRepository,
-    private readonly budgetsRepository: BudgetsRepository,
+    private readonly envelopesRepository: EnvelopesRepository,
     private readonly dataSource: DataSource,
   ) {}
 
-  async create(budgetId: string, createExpenseDto: CreateExpenseDto) {
+  async create(envelopeId: string, createExpenseDto: CreateExpenseDto) {
     return this.dataSource.transaction(async (manager) => {
       const expense = await this.expensesRepository.create(
         {
           ...createExpenseDto,
-          budgetId,
+          envelopeId,
         },
         manager,
       );
 
       // Incremental update - more efficient than recalculation
-      await this.budgetsRepository.incrementSpent(
-        budgetId,
+      await this.envelopesRepository.incrementSpent(
+        envelopeId,
         expense.amount,
         manager,
       );
@@ -40,8 +40,8 @@ export class ExpensesService {
     });
   }
 
-  async findAll(budgetId: string, filters: GetExpensesFilterDto) {
-    const expenses = await this.expensesRepository.findAll(budgetId, filters);
+  async findAll(envelopeId: string, filters: GetExpensesFilterDto) {
+    const expenses = await this.expensesRepository.findAll(envelopeId, filters);
 
     return expenses.map((expense) => ExpenseResponseDto.fromEntity(expense));
   }
@@ -70,11 +70,11 @@ export class ExpensesService {
   }
 
   async update({
-    budget,
+    envelope,
     expenseId,
     updateExpenseDto,
   }: {
-    budget: Budget;
+    envelope: Envelope;
     expenseId: string;
     updateExpenseDto: UpdateExpenseDto;
   }) {
@@ -92,8 +92,8 @@ export class ExpensesService {
       const difference = newAmount - oldExpense.amount;
 
       if (difference !== 0) {
-        await this.budgetsRepository.incrementSpent(
-          budget.id,
+        await this.envelopesRepository.incrementSpent(
+          envelope.id,
           difference,
           manager,
         );
@@ -103,15 +103,15 @@ export class ExpensesService {
     });
   }
 
-  async remove(budget: Budget, expenseId: string) {
+  async remove(envelope: Envelope, expenseId: string) {
     return this.dataSource.transaction(async (manager) => {
       const expense = await this.findOneInternal(expenseId);
 
       await this.expensesRepository.delete(expenseId, manager);
 
       // Decrement spent by expense amount
-      await this.budgetsRepository.decrementSpent(
-        budget.id,
+      await this.envelopesRepository.decrementSpent(
+        envelope.id,
         expense.amount,
         manager,
       );

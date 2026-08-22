@@ -8,6 +8,7 @@ export class ExpenseResponseDto {
   id: string;
   name: string;
   amount: number;
+  currency: string;
   date: Date;
   description?: string;
   createdAt: Date;
@@ -21,6 +22,7 @@ export class ExpenseResponseDto {
       id: expense.id,
       name: expense.name,
       amount: expense.amount,
+      currency: expense.currency,
       date: expense.date,
       description: expense.description,
       createdAt: expense.createdAt,

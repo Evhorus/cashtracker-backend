@@ -3,7 +3,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppConfigModule } from './config/app-config.module';
 
-import { BudgetsModule } from './budgets/budgets.module';
+import { EnvelopesModule } from './envelopes/envelopes.module';
 import { HealthCheckModule } from './health-check/health-check.module';
 import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
@@ -21,7 +21,7 @@ import { ExpensesModule } from './expenses/expenses.module';
       },
     ]),
     DatabaseModule,
-    BudgetsModule,
+    EnvelopesModule,
     ExpensesModule,
     HealthCheckModule,
     AuthModule,

@@ -10,7 +10,7 @@ import {
 import { normalizeString } from 'src/common/utils/string-utils';
 import { Currency } from 'src/common/enums/currency.enum';
 
-export class CreateBudgetDto {
+export class CreateEnvelopeDto {
   @IsString()
   @IsNotEmpty()
   @Transform(({ value }) => normalizeString(value))
@@ -20,10 +20,10 @@ export class CreateBudgetDto {
   @IsNotEmpty()
   currency: Currency;
 
+  @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
-  @IsNotEmpty()
   @IsPositive({ message: 'El monto debe ser mayor a 0' })
-  amount: number;
+  amount?: number | null;
 
   @IsOptional()
   @IsString()

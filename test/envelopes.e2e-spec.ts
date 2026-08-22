@@ -6,7 +6,7 @@ import { DataSource } from 'typeorm';
 import { ClerkAuthGuard } from '../src/auth/guards/clerk-auth.guard';
 import { ThrottlerGuard } from '@nestjs/throttler';
 
-describe('Budgets (e2e)', () => {
+describe('Envelopes (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
 
@@ -56,13 +56,13 @@ describe('Budgets (e2e)', () => {
       return;
     }
     await dataSource.query('DELETE FROM expense');
-    await dataSource.query('DELETE FROM budget');
+    await dataSource.query('DELETE FROM envelope');
   });
 
-  describe('/budgets (POST)', () => {
-    it('should create a new budget', () => {
+  describe('/envelopes (POST)', () => {
+    it('should create a new envelope', () => {
       return request(app.getHttpServer())
-        .post('/budgets')
+        .post('/envelopes')
         .send({
           name: 'Groceries',
           amount: 500,
@@ -78,7 +78,7 @@ describe('Budgets (e2e)', () => {
 
     it('should fail with invalid data', () => {
       return request(app.getHttpServer())
-        .post('/budgets')
+        .post('/envelopes')
         .send({
           name: 'Test',
           amount: -100, // Invalid: negative amount
@@ -88,19 +88,46 @@ describe('Budgets (e2e)', () => {
 
     it('should fail with amount having more than 2 decimals', () => {
       return request(app.getHttpServer())
-        .post('/budgets')
+        .post('/envelopes')
         .send({
           name: 'Test',
           amount: 100.123, // Invalid: 3 decimal places
         })
         .expect(400);
     });
+
+    it('should create an envelope without an amount (no spending limit)', () => {
+      return request(app.getHttpServer())
+        .post('/envelopes')
+        .send({
+          name: 'Unlimited Tracking',
+          currency: 'COP',
+        })
+        .expect(201)
+        .expect((res) => {
+          expect(res.body).toHaveProperty('message', 'Presupuesto creado');
+        });
+    });
+
+    it('should create an envelope with amount: null (no spending limit)', () => {
+      return request(app.getHttpServer())
+        .post('/envelopes')
+        .send({
+          name: 'Unlimited Tracking Explicit Null',
+          currency: 'COP',
+          amount: null,
+        })
+        .expect(201)
+        .expect((res) => {
+          expect(res.body).toHaveProperty('message', 'Presupuesto creado');
+        });
+    });
   });
 
-  describe('/budgets (GET)', () => {
-    it('should return empty array when no budgets exist', () => {
+  describe('/envelopes (GET)', () => {
+    it('should return empty array when no envelopes exist', () => {
       return request(app.getHttpServer())
-        .get('/budgets')
+        .get('/envelopes')
         .expect(200)
         .expect((res) => {
           expect(res.body).toHaveProperty('count', 0);
@@ -109,9 +136,9 @@ describe('Budgets (e2e)', () => {
         });
     });
 
-    it('should return user budgets without expenses', async () => {
-      // Create a budget first
-      await request(app.getHttpServer()).post('/budgets').send({
+    it('should return user envelopes without expenses', async () => {
+      // Create an envelope first
+      await request(app.getHttpServer()).post('/envelopes').send({
         name: 'Groceries',
         amount: 500,
         currency: 'COP',
@@ -119,86 +146,113 @@ describe('Budgets (e2e)', () => {
       });
 
       return request(app.getHttpServer())
-        .get('/budgets')
+        .get('/envelopes')
         .expect(200)
         .expect((res) => {
           expect(res.body.count).toBe(1);
           expect(res.body.data).toHaveLength(1);
           expect(res.body.data[0]).toHaveProperty('name', 'Groceries');
+          expect(res.body.data[0]).toHaveProperty('currency', 'COP');
           expect(parseFloat(res.body.data[0].spent)).toBe(0);
           expect(res.body.data[0]).not.toHaveProperty('userId'); // DTO doesn't expose userId
         });
     });
 
-    it('should only return budgets for authenticated user', async () => {
+    it('should return amount: null for an envelope created without a limit', async () => {
+      await request(app.getHttpServer()).post('/envelopes').send({
+        name: 'No Limit',
+        currency: 'COP',
+      });
+
+      return request(app.getHttpServer())
+        .get('/envelopes')
+        .expect(200)
+        .expect((res) => {
+          const envelope = res.body.data.find(
+            (b: { name: string }) => b.name === 'No Limit',
+          );
+          expect(envelope).toBeDefined();
+          expect(envelope.amount).toBeNull();
+        });
+    });
+
+    it('should only return envelopes for authenticated user', async () => {
       // This test verifies ownership isolation
-      // In a real scenario, you'd create budgets for different users
-      await request(app.getHttpServer()).post('/budgets').send({
-        name: 'My Budget',
+      // In a real scenario, you'd create envelopes for different users
+      await request(app.getHttpServer()).post('/envelopes').send({
+        name: 'My Envelope',
         amount: 1000,
         currency: 'COP',
       });
 
       return request(app.getHttpServer())
-        .get('/budgets')
+        .get('/envelopes')
         .expect(200)
         .expect((res) => {
           expect(res.body.count).toBe(1);
-          // All budgets should belong to mockUser
+          // All envelopes should belong to mockUser
         });
     });
   });
 
-  describe('/budgets/:budgetId (GET)', () => {
-    it('should return budget with expenses', async () => {
-      // Create budget via API
-      const res = await request(app.getHttpServer())
-        .post('/budgets')
-        .send({
-          name: 'Groceries',
-          amount: 500,
-          currency: 'COP',
-          category: 'Food',
-        });
-      const budgetId = res.body.id || (await dataSource.query('SELECT id FROM budget ORDER BY created_at DESC LIMIT 1'))[0].id;
+  describe('/envelopes/:envelopeId (GET)', () => {
+    it('should return envelope with expenses', async () => {
+      // Create envelope via API
+      const res = await request(app.getHttpServer()).post('/envelopes').send({
+        name: 'Groceries',
+        amount: 500,
+        currency: 'COP',
+        category: 'Food',
+      });
+      const envelopeId =
+        res.body.id ||
+        (
+          await dataSource.query(
+            'SELECT id FROM envelope ORDER BY created_at DESC LIMIT 1',
+          )
+        )[0].id;
 
       return request(app.getHttpServer())
-        .get(`/budgets/${budgetId}`)
+        .get(`/envelopes/${envelopeId}`)
         .expect(200)
         .expect((res) => {
-          expect(res.body).toHaveProperty('id', budgetId);
+          expect(res.body).toHaveProperty('id', envelopeId);
           expect(res.body).toHaveProperty('expenses');
           expect(Array.isArray(res.body.expenses)).toBe(true);
         });
     });
 
-    it('should return 404 for non-existent budget', () => {
+    it('should return 404 for non-existent envelope', () => {
       return request(app.getHttpServer())
-        .get('/budgets/00000000-0000-0000-0000-000000000000')
+        .get('/envelopes/00000000-0000-0000-0000-000000000000')
         .expect(404);
     });
 
     it('should return 400 for invalid UUID', () => {
       return request(app.getHttpServer())
-        .get('/budgets/invalid-uuid')
+        .get('/envelopes/invalid-uuid')
         .expect(400);
     });
   });
 
-  describe('/budgets/:budgetId (PATCH)', () => {
-    it('should update budget', async () => {
-      // Create budget via API
-      const res = await request(app.getHttpServer())
-        .post('/budgets')
-        .send({
-          name: 'Old Name',
-          amount: 500,
-          currency: 'COP',
-        });
-      const budgetId = res.body.id || (await dataSource.query('SELECT id FROM budget ORDER BY created_at DESC LIMIT 1'))[0].id;
+  describe('/envelopes/:envelopeId (PATCH)', () => {
+    it('should update envelope', async () => {
+      // Create envelope via API
+      const res = await request(app.getHttpServer()).post('/envelopes').send({
+        name: 'Old Name',
+        amount: 500,
+        currency: 'COP',
+      });
+      const envelopeId =
+        res.body.id ||
+        (
+          await dataSource.query(
+            'SELECT id FROM envelope ORDER BY created_at DESC LIMIT 1',
+          )
+        )[0].id;
 
       return request(app.getHttpServer())
-        .patch(`/budgets/${budgetId}`)
+        .patch(`/envelopes/${envelopeId}`)
         .send({ name: 'New Name', amount: 600 })
         .expect(200)
         .expect((res) => {
@@ -207,21 +261,27 @@ describe('Budgets (e2e)', () => {
     });
   });
 
-  describe('/budgets/:budgetId (DELETE)', () => {
-    it('should delete budget and cascade expenses', async () => {
-      // Create budget via API
-      const budgetRes = await request(app.getHttpServer())
-        .post('/budgets')
+  describe('/envelopes/:envelopeId (DELETE)', () => {
+    it('should delete envelope and cascade expenses', async () => {
+      // Create envelope via API
+      const envelopeRes = await request(app.getHttpServer())
+        .post('/envelopes')
         .send({
           name: 'To Delete',
           amount: 500,
           currency: 'COP',
         });
-      const budgetId = budgetRes.body.id || (await dataSource.query('SELECT id FROM budget ORDER BY created_at DESC LIMIT 1'))[0].id;
+      const envelopeId =
+        envelopeRes.body.id ||
+        (
+          await dataSource.query(
+            'SELECT id FROM envelope ORDER BY created_at DESC LIMIT 1',
+          )
+        )[0].id;
 
       // Create expense via API
       await request(app.getHttpServer())
-        .post(`/budgets/${budgetId}/expenses`)
+        .post(`/envelopes/${envelopeId}/expenses`)
         .send({
           name: 'Expense',
           amount: 50,
@@ -229,22 +289,22 @@ describe('Budgets (e2e)', () => {
           date: new Date().toISOString().split('T')[0],
         });
 
-      // Delete budget
+      // Delete envelope
       await request(app.getHttpServer())
-        .delete(`/budgets/${budgetId}`)
+        .delete(`/envelopes/${envelopeId}`)
         .expect(200);
 
-      // Verify budget is deleted
-      const budgets = await dataSource.query(
-        'SELECT * FROM budget WHERE id = $1',
-        [budgetId],
+      // Verify envelope is deleted
+      const envelopes = await dataSource.query(
+        'SELECT * FROM envelope WHERE id = $1',
+        [envelopeId],
       );
-      expect(budgets).toHaveLength(0);
+      expect(envelopes).toHaveLength(0);
 
       // Verify expenses are cascaded
       const expenses = await dataSource.query(
-        'SELECT * FROM expense WHERE "budgetId" = $1',
-        [budgetId],
+        'SELECT * FROM expense WHERE "envelopeId" = $1',
+        [envelopeId],
       );
       expect(expenses).toHaveLength(0);
     });

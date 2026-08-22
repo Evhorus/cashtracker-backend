@@ -16,12 +16,12 @@ import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
 import { GetExpensesFilterDto } from './dto/get-expenses-filter.dto';
 import type { Request } from 'express';
-import { BudgetExists } from '../budgets/decorators/budget-exists.decorator';
+import { EnvelopeExists } from '../envelopes/decorators/envelope-exists.decorator';
 import { ExpenseExists } from './decorators/expense-exists.decorator';
 import { ExpensesService } from './expenses.service';
 
-@Controller('budgets/:budgetId/expenses')
-@BudgetExists() // All routes here require the budget to exist and belong to the user
+@Controller('envelopes/:envelopeId/expenses')
+@EnvelopeExists() // All routes here require the envelope to exist and belong to the user
 export class ExpensesController {
   constructor(private readonly expensesService: ExpensesService) {}
 
@@ -30,19 +30,19 @@ export class ExpensesController {
     @Body() createExpenseDto: CreateExpenseDto,
     @Req() req: Request,
   ) {
-    const budgetId = req.budget?.id;
-    if (!budgetId) {
-      throw new BadRequestException('Budget not found in request');
+    const envelopeId = req.envelope?.id;
+    if (!envelopeId) {
+      throw new BadRequestException('Envelope not found in request');
     }
-    return this.expensesService.create(budgetId, createExpenseDto);
+    return this.expensesService.create(envelopeId, createExpenseDto);
   }
 
   @Get()
   findAllExpenses(
-    @Param('budgetId', ParseUUIDPipe) budgetId: string,
+    @Param('envelopeId', ParseUUIDPipe) envelopeId: string,
     @Query() filters: GetExpensesFilterDto,
   ) {
-    return this.expensesService.findAll(budgetId, filters);
+    return this.expensesService.findAll(envelopeId, filters);
   }
 
   @ExpenseExists()
@@ -58,11 +58,15 @@ export class ExpensesController {
     @Body() updateExpenseDto: UpdateExpenseDto,
     @Req() req: Request,
   ) {
-    const budget = req.budget;
-    if (!budget) {
-      throw new BadRequestException('Budget not found in request');
+    const envelope = req.envelope;
+    if (!envelope) {
+      throw new BadRequestException('Envelope not found in request');
     }
-    return this.expensesService.update({ budget, expenseId, updateExpenseDto });
+    return this.expensesService.update({
+      envelope,
+      expenseId,
+      updateExpenseDto,
+    });
   }
 
   @ExpenseExists()
@@ -71,10 +75,10 @@ export class ExpensesController {
     @Param('expenseId', ParseUUIDPipe) expenseId: string,
     @Req() req: Request,
   ) {
-    const budget = req.budget;
-    if (!budget) {
-      throw new BadRequestException('Budget not found in request');
+    const envelope = req.envelope;
+    if (!envelope) {
+      throw new BadRequestException('Envelope not found in request');
     }
-    return this.expensesService.remove(budget, expenseId);
+    return this.expensesService.remove(envelope, expenseId);
   }
 }
