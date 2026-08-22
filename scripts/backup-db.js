@@ -23,7 +23,13 @@ async function main() {
   // previously this forced verify-full *and* passed rejectUnauthorized:
   // false, which never took effect (see that file's comment for why) and
   // just made the actual TLS behavior harder to reason about.
-  if (!dbUrl.searchParams.has("sslmode")) {
+  const currentSslMode = dbUrl.searchParams.get("sslmode");
+  const WEAK_SSL_ALIASES = new Set(["require", "prefer", "verify-ca"]);
+  if (!currentSslMode) {
+    dbUrl.searchParams.set("sslmode", "verify-full");
+  } else if (WEAK_SSL_ALIASES.has(currentSslMode)) {
+    // pg-connection-string treats these as aliases for verify-full today
+    // (with a deprecation warning) - make it explicit instead.
     dbUrl.searchParams.set("sslmode", "verify-full");
   }
 

@@ -19,8 +19,21 @@ const dbUrl = new URL(process.env.DATABASE_URL as string);
 // overwrites it, so verify-full always won and the `extra.ssl` block never
 // actually took effect; it just misleadingly suggested verification was
 // off. Removed rather than fixed in place, since it did nothing.
-if (!dbUrl.searchParams.has('sslmode')) {
+const currentSslMode = dbUrl.searchParams.get('sslmode');
+
+// pg-connection-string currently treats 'require'/'prefer'/'verify-ca' as
+// plain aliases for 'verify-full' (hence the "SECURITY WARNING... treated
+// as aliases" log line - it's not an error, just a heads-up that this
+// aliasing is deprecated and may not hold in a future version). Neon's
+// connection strings default to `?sslmode=require`, so in production make
+// the actual intent explicit instead of depending on that aliasing to keep
+// meaning "verified" - an explicit 'disable' or 'verify-full' is left as-is.
+const WEAK_SSL_ALIASES = new Set(['require', 'prefer', 'verify-ca']);
+
+if (!currentSslMode) {
   dbUrl.searchParams.set('sslmode', isProduction ? 'verify-full' : 'disable');
+} else if (isProduction && WEAK_SSL_ALIASES.has(currentSslMode)) {
+  dbUrl.searchParams.set('sslmode', 'verify-full');
 }
 
 export const dataSourceOptions: DataSourceOptions = {
