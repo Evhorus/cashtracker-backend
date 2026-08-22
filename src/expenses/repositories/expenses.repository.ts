@@ -52,7 +52,6 @@ export class ExpensesRepository {
       startDate?: string;
       endDate?: string;
       search?: string;
-      categoryId?: string;
       sort?: 'ASC' | 'DESC';
     },
     page: number,

@@ -103,6 +103,8 @@ describe('Expenses (e2e)', () => {
         ])
       )[0].id;
 
+      // An envelope owned by someone else must look the same as one that
+      // doesn't exist at all - see EnvelopeExistsGuard.
       await request(app.getHttpServer())
         .post(`/envelopes/${envelopeId}/expenses`)
         .send({
@@ -111,7 +113,7 @@ describe('Expenses (e2e)', () => {
           currency: 'COP',
           date: '2024-05-12',
         })
-        .expect(401);
+        .expect(404);
     });
   });
 

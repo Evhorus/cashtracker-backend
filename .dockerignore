@@ -1,0 +1,41 @@
+# --- VCS / editor / tooling ---
+.git
+.gitignore
+.github
+.vscode
+.idea
+.agents
+.claude
+
+# --- Never ship secrets or local env into the build context ---
+.env
+.env.*
+!.env.template
+
+# --- Build artifacts (rebuilt inside the image) ---
+dist
+node_modules
+coverage
+.nyc_output
+
+# --- Local data that must never end up in an image layer ---
+backups
+
+# --- Docs / non-runtime files ---
+README.md
+CLAUDE.md
+*.md
+
+# --- Tests (not needed at runtime) ---
+test
+
+# --- Docker meta files themselves ---
+Dockerfile
+Dockerfile.*
+.dockerignore
+docker-compose*.yml
+
+# --- Misc ---
+*.log
+.DS_Store
+skills-lock.json

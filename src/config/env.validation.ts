@@ -12,6 +12,11 @@ const envSchema = z.object({
   API_URL: z.url(),
   DATABASE_URL: z.url(),
   CLERK_SECRET_KEY: z.string().min(1),
+  // Read directly from process.env by src/database/data-source.ts (which
+  // also backs the TypeORM CLI, outside Nest's DI/ConfigService) - included
+  // here too so it's validated and documented in one place. Set to 'false'
+  // to run migrations as a separate release step instead of on every boot.
+  MIGRATIONS_RUN_ON_BOOT: z.enum(['true', 'false']).default('true'),
 });
 
 export function validate(config: Record<string, unknown>) {

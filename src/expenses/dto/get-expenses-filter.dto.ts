@@ -15,10 +15,6 @@ export class GetExpensesFilterDto extends PaginationQueryDto {
   search?: string;
 
   @IsOptional()
-  @IsString()
-  categoryId?: string;
-
-  @IsOptional()
   @IsIn(['ASC', 'DESC'])
   sort?: 'ASC' | 'DESC';
 }
