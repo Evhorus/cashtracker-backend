@@ -193,6 +193,48 @@ describe('Envelopes (e2e)', () => {
           // All envelopes should belong to mockUser
         });
     });
+
+    it('should filter by search across name and category, case-insensitively', async () => {
+      await request(app.getHttpServer()).post('/envelopes').send({
+        name: 'Groceries',
+        currency: 'COP',
+        category: 'Food',
+      });
+      await request(app.getHttpServer()).post('/envelopes').send({
+        name: 'Rent',
+        currency: 'COP',
+        category: 'Housing',
+      });
+
+      // Matches by name
+      await request(app.getHttpServer())
+        .get('/envelopes')
+        .query({ search: 'groc' })
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.meta.total).toBe(1);
+          expect(res.body.data[0]).toHaveProperty('name', 'Groceries');
+        });
+
+      // Matches by category, case-insensitively
+      await request(app.getHttpServer())
+        .get('/envelopes')
+        .query({ search: 'HOUS' })
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.meta.total).toBe(1);
+          expect(res.body.data[0]).toHaveProperty('name', 'Rent');
+        });
+
+      // No match
+      await request(app.getHttpServer())
+        .get('/envelopes')
+        .query({ search: 'nonexistent' })
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.meta.total).toBe(0);
+        });
+    });
   });
 
   describe('/envelopes/:envelopeId (GET)', () => {

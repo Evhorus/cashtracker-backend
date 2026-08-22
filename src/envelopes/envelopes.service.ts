@@ -25,13 +25,20 @@ export class EnvelopesService {
 
   /**
    * Find all envelopes without expenses (light query for list view),
-   * paginated (page is 1-indexed).
+   * paginated (page is 1-indexed). `search` optionally filters by
+   * name/category.
    */
-  async findAllLight(userId: string, page: number, limit: number) {
+  async findAllLight(
+    userId: string,
+    page: number,
+    limit: number,
+    search?: string,
+  ) {
     const [envelopes, total] = await this.envelopesRepository.findByUserIdLight(
       userId,
       page,
       limit,
+      search,
     );
 
     return new PaginatedResponseDto(

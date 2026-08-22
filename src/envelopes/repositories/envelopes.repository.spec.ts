@@ -22,12 +22,34 @@ describe('EnvelopesRepository', () => {
     updatedAt: new Date(),
   };
 
+  // Chainable createQueryBuilder mock - each method returns `this` like the
+  // real QueryBuilder, so findByUserIdLight's chained calls resolve to it.
+  let mockQueryBuilder: {
+    where: jest.Mock;
+    andWhere: jest.Mock;
+    select: jest.Mock;
+    orderBy: jest.Mock;
+    skip: jest.Mock;
+    take: jest.Mock;
+    getManyAndCount: jest.Mock;
+  };
+
   beforeEach(async () => {
+    mockQueryBuilder = {
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn(),
+    };
+
     // Create mock repository
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     mockRepository = {
       findAndCount: jest.fn(),
-      createQueryBuilder: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
       findOneBy: jest.fn(),
       findOne: jest.fn(),
       create: jest.fn(),
@@ -59,43 +81,64 @@ describe('EnvelopesRepository', () => {
     it('should find a page of envelopes without expenses', async () => {
       // Arrange
       const userId = 'user-123';
-      mockRepository.findAndCount.mockResolvedValue([[mockEnvelope], 1]);
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockEnvelope], 1]);
 
       // Act
       const result = await repository.findByUserIdLight(userId, 1, 20);
 
       // Assert
       expect(result).toEqual([[mockEnvelope], 1]);
-      expect(mockRepository.findAndCount).toHaveBeenCalledWith({
-        where: { userId },
-        select: [
-          'id',
-          'name',
-          'amount',
-          'currency',
-          'spent',
-          'category',
-          'description',
-          'createdAt',
-          'updatedAt',
-        ],
-        order: { createdAt: 'DESC' },
-        skip: 0,
-        take: 20,
-      });
+      expect(mockRepository.createQueryBuilder).toHaveBeenCalledWith(
+        'envelope',
+      );
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'envelope.userId = :userId',
+        { userId },
+      );
+      expect(mockQueryBuilder.andWhere).not.toHaveBeenCalled();
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+        'envelope.createdAt',
+        'DESC',
+      );
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(20);
     });
 
     it('should compute the correct offset for page 3', async () => {
       // Arrange
-      mockRepository.findAndCount.mockResolvedValue([[], 0]);
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
 
       // Act
       await repository.findByUserIdLight('user-123', 3, 20);
 
       // Assert
-      expect(mockRepository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({ skip: 40, take: 20 }),
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(40);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(20);
+    });
+
+    it('should filter by search term across name and category', async () => {
+      // Arrange
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockEnvelope], 1]);
+
+      // Act
+      await repository.findByUserIdLight('user-123', 1, 20, 'grocer');
+
+      // Assert
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        '(LOWER(envelope.name) LIKE LOWER(:search) OR LOWER(envelope.category) LIKE LOWER(:search))',
+        { search: '%grocer%' },
       );
+    });
+
+    it('should not filter when search is omitted', async () => {
+      // Arrange
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockEnvelope], 1]);
+
+      // Act
+      await repository.findByUserIdLight('user-123', 1, 20);
+
+      // Assert
+      expect(mockQueryBuilder.andWhere).not.toHaveBeenCalled();
     });
   });
 
