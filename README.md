@@ -4,7 +4,7 @@ API REST construida con [NestJS](https://nestjs.org) para la gestión de presupu
 
 ## Requisitos Previos
 
-- Node.js 20.x o superior
+- Node.js 22.x o superior (la imagen Docker de producción está fijada a esta versión)
 - pnpm (recomendado)
 - PostgreSQL
 
@@ -91,63 +91,45 @@ pnpm run format
 
 ## Estructura del Proyecto
 
+El proyecto es domain-driven: cada dominio de negocio vive en su propio
+módulo bajo `src/`, y todos siguen el mismo patrón interno (por eso no se
+documenta un árbol completo, literal, que se desactualiza con cada feature
+nueva):
+
 ```
-cashtracker-backend/
-├── src/
-│   ├── auth/                         # Autenticación con Clerk y Passport
-│   │   ├── decorators/               # @CurrentUser, @Public
-│   │   ├── guards/                   # ClerkAuthGuard
-│   │   ├── providers/                # ClerkClientProvider
-│   │   ├── strategies/               # ClerkStrategy
-│   │   └── auth.module.ts
-│   ├── envelopes/                      # Gestión de presupuestos
-│   │   ├── decorators/               # @EnvelopeExists
-│   │   ├── dto/                      # Create/Update/Response DTOs
-│   │   ├── entities/                 # Entidad Envelope (TypeORM)
-│   │   ├── guard/                    # EnvelopeExistsGuard
-│   │   ├── repositories/             # EnvelopesRepository (Data Mapper)
-│   │   ├── envelopes.controller.ts     # Rutas de presupuestos
-│   │   ├── envelopes.service.ts        # Lógica de negocio
-│   │   └── envelopes.module.ts
-│   ├── expenses/                     # Gestión de gastos
-│   │   ├── decorators/               # @ExpenseExists
-│   │   ├── dto/                      # Create/Update/Response DTOs
-│   │   ├── entities/                 # Entidad Expense (TypeORM)
-│   │   ├── guards/                   # ExpenseExistsGuard
-│   │   ├── repositories/             # ExpensesRepository (Data Mapper)
-│   │   ├── expenses.controller.ts    # Rutas de gastos
-│   │   ├── expenses.service.ts       # Lógica de negocio
-│   │   └── expenses.module.ts
-│   ├── common/                       # Componentes compartidos
-│   │   ├── constants/                # Mensajes de error globales
-│   │   ├── pipes/                    # Pipes de transformación/validación
-│   │   └── utils/                    # Funciones de utilidad comunes
-│   ├── config/                       # Configuración y validación (Zod)
-│   │   └── env.validation.ts
-│   ├── database/                     # Persistencia de datos
-│   │   ├── migrations/               # Historial de migraciones
-│   │   ├── data-source.ts            # Configuración para TypeORM CLI
-│   │   └── database.module.ts
-│   ├── health-check/                 # Monitoreo de disponibilidad
-│   │   ├── health-check.controller.ts
-│   │   ├── health-check.service.ts
-│   │   └── health-check.module.ts
-│   ├── app.module.ts                 # Ensamblaje de la aplicación
-│   └── main.ts                       # Punto de entrada principal
-├── scripts/                          # Herramientas de desarrollo
-│   ├── migration-master.ts           # Gestor de migraciones
-│   └── typeorm-generate.ts           # Generador de migraciones
-├── test/                             # Pruebas End-to-End (E2E)
-├── .env.template                     # Plantilla de variables de entorno
-├── .gitignore                        # Archivos excluidos de Git
-├── .prettierrc                       # Configuración de formateo (Prettier)
-├── eslint.config.mjs                 # Reglas de linting (ESLint)
-├── nest-cli.json                     # Configuración del CLI de NestJS
-├── package.json                      # Scripts y dependencias
-├── pnpm-lock.yaml                    # Versiones exactas de dependencias
-├── tsconfig.build.json               # Configuración de compilación (dist)
-└── tsconfig.json                     # Configuración base de TypeScript
+src/<dominio>/
+├── decorators/       # p. ej. @EnvelopeExists / @ExpenseExists
+├── dto/              # DTOs de entrada (class-validator) y de respuesta
+│                     # (factories estáticas fromEntity/fromEntities)
+├── entities/         # Entidad TypeORM
+├── guard(s)/         # <Dominio>ExistsGuard (el nombre de la carpeta,
+│                     # singular o plural, varía según el módulo)
+├── repositories/     # Repositorio (Data Mapper) sobre el repo de TypeORM
+├── <dominio>.controller.ts
+├── <dominio>.service.ts
+└── <dominio>.module.ts
 ```
+
+Dominios actuales bajo `src/`:
+
+- **`auth/`** — Autenticación con Clerk y Passport (`ClerkAuthGuard`,
+  `ClerkStrategy`, decoradores `@CurrentUser` y `@Public`). El guard es
+  global: toda ruta requiere autenticación salvo que esté marcada `@Public()`.
+- **`envelopes/`** — Gestión de presupuestos (sigue el patrón de arriba).
+- **`expenses/`** — Gestión de gastos, anidado bajo cada envelope (sigue el
+  patrón de arriba).
+- **`dashboard/`** — Resumen agregado de sobres/gastos, de solo lectura (sin
+  entidad ni guard propios).
+- **`common/`** — DTOs compartidos (paginación), constantes de error
+  centralizadas, pipes y utilidades.
+- **`config/`** — Validación de variables de entorno con Zod.
+- **`database/`** — Configuración de TypeORM y migraciones (`migrations/`,
+  `data-source.ts`, `database.module.ts`).
+- **`health-check/`** — Expone `/api/health-check` y corre un ping
+  periódico (`@Cron`) para evitar que Render hiberne la instancia gratuita.
+
+Fuera de `src/`, lo relevante: `scripts/` (gestor de migraciones), `test/`
+(E2E) y `.env.template` (plantilla de variables de entorno).
 
 ## Base de Datos y Migraciones
 
@@ -176,7 +158,8 @@ pnpm migration show
 ### Envelopes (Presupuestos)
 
 - `POST /api/envelopes` - Crear un nuevo presupuesto
-- `GET /api/envelopes` - Obtener todos los presupuestos del usuario
+- `GET /api/envelopes` - Obtener los presupuestos del usuario (paginado:
+  `page`, `limit`; filtrable con `search`)
 - `GET /api/envelopes/:envelopeId` - Obtener un presupuesto específico
 - `PATCH /api/envelopes/:envelopeId` - Actualizar un presupuesto
 - `DELETE /api/envelopes/:envelopeId` - Eliminar un presupuesto
@@ -184,27 +167,38 @@ pnpm migration show
 ### Expenses (Gastos)
 
 - `POST /api/envelopes/:envelopeId/expenses` - Crear un gasto en un presupuesto
-- `GET /api/envelopes/:envelopeId/expenses` - Obtener todos los gastos de un presupuesto
+- `GET /api/envelopes/:envelopeId/expenses` - Obtener los gastos de un
+  presupuesto (paginado: `page`, `limit`; filtrable con `search`,
+  `startDate`, `endDate`, `sort`)
 - `GET /api/envelopes/:envelopeId/expenses/:expenseId` - Obtener un gasto específico
 - `PATCH /api/envelopes/:envelopeId/expenses/:expenseId` - Actualizar un gasto
 - `DELETE /api/envelopes/:envelopeId/expenses/:expenseId` - Eliminar un gasto
 
+### Dashboard
+
+- `GET /api/dashboard/summary` - Resumen agregado de presupuestos y gastos
+  del usuario (opcionalmente filtrable por año con `year`)
+
 ## Tecnologías
 
-- **Framework:** NestJS 11.0.1
+- **Framework:** NestJS 11
 - **Node.js:** Runtime JavaScript
 - **TypeScript:** Lenguaje de programación
-- **Autenticación:** Clerk (@clerk/backend)
+- **Autenticación:** Clerk (@clerk/backend), guard global con opt-out vía `@Public()`
 - **Base de Datos:** PostgreSQL con TypeORM
 - **Migraciones:** Gestión de esquema mediante TypeORM CLI
 - **Validación:** class-validator, class-transformer, Zod
 - **Testing:** Jest, Supertest
+- **Seguridad y confiabilidad:** Helmet (cabeceras HTTP), `@nestjs/throttler`
+  (rate limiting global) y `@nestjs/schedule` + `@nestjs/axios` (ping
+  periódico de keep-alive para evitar la hibernación en free tiers)
 
 ## Características
 
 - ✅ Autenticación con Clerk
 - ✅ CRUD completo de presupuestos
 - ✅ CRUD completo de gastos (Módulo independiente)
+- ✅ Dashboard con resumen agregado por año
 - ✅ Validación de datos con DTOs y Zod
 - ✅ Guards personalizados para validación de recursos
 - ✅ Gestión de base de datos mediante migraciones
