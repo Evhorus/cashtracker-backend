@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Envelope } from '../../envelopes/entities/envelope.entity';
 
 interface SummaryAggregateRow {
+  currency: string;
   count: string;
   totalAssigned: string;
   totalSpent: string;
@@ -36,29 +37,34 @@ export class DashboardRepository {
   }
 
   /**
-   * Single aggregate query: envelope count, sum of assigned amounts
-   * (capped envelopes only), sum of spent (all envelopes), and sum of
-   * spent restricted to capped envelopes (needed to compute
-   * totalAvailable without including unlimited envelopes as if they
-   * had a $0 budget).
+   * Aggregate query grouped by currency: envelope count, sum of assigned
+   * amounts (capped envelopes only), sum of spent (all envelopes), and
+   * sum of spent restricted to capped envelopes (needed to compute
+   * totalAvailable without including unlimited envelopes as if they had
+   * a $0 budget) - one row per currency the user has envelopes in.
+   * Money in different currencies is never one unit, so this can't be a
+   * single flat aggregate the way it used to be.
    */
   async getSummaryAggregate(userId: string, year?: number) {
-    const raw = await this.withUserAndYear(userId, year)
-      .select('COUNT(*)', 'count')
+    const rows = await this.withUserAndYear(userId, year)
+      .select('envelope.currency', 'currency')
+      .addSelect('COUNT(*)', 'count')
       .addSelect('COALESCE(SUM(envelope.amount), 0)', 'totalAssigned')
       .addSelect('COALESCE(SUM(envelope.spent), 0)', 'totalSpent')
       .addSelect(
         'COALESCE(SUM(CASE WHEN envelope.amount IS NOT NULL THEN envelope.spent ELSE 0 END), 0)',
         'cappedSpent',
       )
-      .getRawOne<SummaryAggregateRow>();
+      .groupBy('envelope.currency')
+      .getRawMany<SummaryAggregateRow>();
 
-    return {
-      count: Number(raw?.count ?? 0),
-      totalAssigned: Number(raw?.totalAssigned ?? 0),
-      totalSpent: Number(raw?.totalSpent ?? 0),
-      cappedSpent: Number(raw?.cappedSpent ?? 0),
-    };
+    return rows.map((row) => ({
+      currency: row.currency,
+      count: Number(row.count),
+      totalAssigned: Number(row.totalAssigned),
+      totalSpent: Number(row.totalSpent),
+      cappedSpent: Number(row.cappedSpent),
+    }));
   }
 
   /**

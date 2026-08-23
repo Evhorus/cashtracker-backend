@@ -27,15 +27,16 @@ export class DashboardService {
     userId: string,
     year?: number,
   ): Promise<DashboardSummaryResponseDto> {
-    const [aggregate, monthlySpending, availableYears] = await Promise.all([
-      this.dashboardRepository.getSummaryAggregate(userId, year),
-      this.dashboardRepository.getMonthlySpending(
-        userId,
-        year,
-        CHART_MONTHS_LIMIT,
-      ),
-      this.dashboardRepository.getAvailableYears(userId),
-    ]);
+    const [currencyAggregates, monthlySpending, availableYears] =
+      await Promise.all([
+        this.dashboardRepository.getSummaryAggregate(userId, year),
+        this.dashboardRepository.getMonthlySpending(
+          userId,
+          year,
+          CHART_MONTHS_LIMIT,
+        ),
+        this.dashboardRepository.getAvailableYears(userId),
+      ]);
 
     // Only disambiguate the label with a year when the returned range
     // actually spans more than one - e.g. filtered to a single year, or
@@ -44,10 +45,19 @@ export class DashboardService {
       new Set(monthlySpending.map((row) => row.month.slice(0, 4))).size > 1;
 
     return {
-      totalEnvelopes: aggregate.count,
-      totalAssigned: aggregate.totalAssigned,
-      totalSpent: aggregate.totalSpent,
-      totalAvailable: aggregate.totalAssigned - aggregate.cappedSpent,
+      // Currency-agnostic - "how many envelopes" doesn't need splitting
+      // by currency the way the money totals below do.
+      totalEnvelopes: currencyAggregates.reduce(
+        (sum, row) => sum + row.count,
+        0,
+      ),
+      totals: currencyAggregates.map((row) => ({
+        currency: row.currency,
+        totalEnvelopes: row.count,
+        totalAssigned: row.totalAssigned,
+        totalSpent: row.totalSpent,
+        totalAvailable: row.totalAssigned - row.cappedSpent,
+      })),
       chart: monthlySpending.map((row) => ({
         label: formatMonthLabel(row.month, spansMultipleYears),
         spent: row.spent,
