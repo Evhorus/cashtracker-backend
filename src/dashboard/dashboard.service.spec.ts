@@ -120,5 +120,58 @@ describe('DashboardService', () => {
       expect(result.totalEnvelopes).toBe(0);
       expect(result.totals).toEqual([]);
     });
+
+    it('should scope the monthly chart to the primary (most-used) currency', async () => {
+      // Arrange - USD listed first here on purpose: the aggregate is
+      // already sorted by count DESC by the repository, so the service
+      // shouldn't need to re-sort, just trust row 0.
+      repository.getSummaryAggregate.mockResolvedValue([
+        {
+          currency: 'USD',
+          count: 5,
+          totalAssigned: 1000,
+          totalSpent: 200,
+          cappedSpent: 200,
+        },
+        {
+          currency: 'COP',
+          count: 1,
+          totalAssigned: 100_000,
+          totalSpent: 0,
+          cappedSpent: 0,
+        },
+      ]);
+      repository.getMonthlySpending.mockResolvedValue([
+        { month: '2026-08', spent: 200, available: 800 },
+      ]);
+      repository.getAvailableYears.mockResolvedValue([2026]);
+
+      // Act
+      const result = await service.getSummary('user-123');
+
+      // Assert
+      expect(repository.getMonthlySpending).toHaveBeenCalledWith(
+        'user-123',
+        undefined,
+        12,
+        'USD',
+      );
+      expect(result.chart).toEqual([
+        { label: 'Ago', spent: 200, available: 800 },
+      ]);
+    });
+
+    it('should skip the monthly spending query entirely when there are no envelopes', async () => {
+      // Arrange
+      repository.getSummaryAggregate.mockResolvedValue([]);
+      repository.getAvailableYears.mockResolvedValue([]);
+
+      // Act
+      const result = await service.getSummary('user-123');
+
+      // Assert
+      expect(repository.getMonthlySpending).not.toHaveBeenCalled();
+      expect(result.chart).toEqual([]);
+    });
   });
 });

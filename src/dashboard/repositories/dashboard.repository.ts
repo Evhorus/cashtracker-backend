@@ -75,7 +75,13 @@ export class DashboardRepository {
 
   /**
    * Spending grouped by calendar month (of envelope.createdAt), most
-   * recent `limit` months, returned chronologically ascending.
+   * recent `limit` months, returned chronologically ascending. Scoped to
+   * a single `currency` - summing spent/available across currencies
+   * would mix units on the same bars the same way the old flat summary
+   * totals did (see getSummaryAggregate's doc comment). The service
+   * picks the user's most-used currency and passes it in here; a
+   * genuine per-currency chart (multiple charts, or a picker) is a
+   * bigger UI change than scoping to one.
    *
    * Grouping by envelope (the previous chart) mixed unrelated axes -
    * envelopes here are really "one account for one month" (e.g.
@@ -90,8 +96,10 @@ export class DashboardRepository {
     userId: string,
     year: number | undefined,
     limit: number,
+    currency: string,
   ) {
     const rows = await this.withUserAndYear(userId, year)
+      .andWhere('envelope.currency = :currency', { currency })
       .select("TO_CHAR(envelope.createdAt, 'YYYY-MM')", 'month')
       .addSelect('COALESCE(SUM(envelope.spent), 0)', 'spent')
       .addSelect(
