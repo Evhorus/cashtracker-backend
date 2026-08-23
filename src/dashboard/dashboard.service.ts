@@ -27,16 +27,27 @@ export class DashboardService {
     userId: string,
     year?: number,
   ): Promise<DashboardSummaryResponseDto> {
-    const [currencyAggregates, monthlySpending, availableYears] =
-      await Promise.all([
-        this.dashboardRepository.getSummaryAggregate(userId, year),
-        this.dashboardRepository.getMonthlySpending(
-          userId,
-          year,
-          CHART_MONTHS_LIMIT,
-        ),
-        this.dashboardRepository.getAvailableYears(userId),
-      ]);
+    // getMonthlySpending needs to know the primary currency before it can
+    // run (see its own doc comment on why it's scoped to one currency),
+    // so this can't be a single Promise.all the way the three queries
+    // used to be - the aggregate has to resolve first.
+    const currencyAggregates =
+      await this.dashboardRepository.getSummaryAggregate(userId, year);
+    // Already ordered by envelope count DESC - the same "most-used
+    // currency" the summary totals put first.
+    const primaryCurrency = currencyAggregates[0]?.currency;
+
+    const [monthlySpending, availableYears] = await Promise.all([
+      primaryCurrency
+        ? this.dashboardRepository.getMonthlySpending(
+            userId,
+            year,
+            CHART_MONTHS_LIMIT,
+            primaryCurrency,
+          )
+        : Promise.resolve([]),
+      this.dashboardRepository.getAvailableYears(userId),
+    ]);
 
     // Only disambiguate the label with a year when the returned range
     // actually spans more than one - e.g. filtered to a single year, or
