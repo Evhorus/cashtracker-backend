@@ -56,6 +56,12 @@ export class DashboardRepository {
         'cappedSpent',
       )
       .groupBy('envelope.currency')
+      // Most-used currency first (by envelope count) - GROUP BY alone
+      // has no defined row order, and the frontend renders the first
+      // entry inline as the "primary" one, the rest in their own
+      // labeled rows below. Without this, which currency ends up
+      // "primary" is arbitrary.
+      .orderBy('count', 'DESC')
       .getRawMany<SummaryAggregateRow>();
 
     return rows.map((row) => ({
