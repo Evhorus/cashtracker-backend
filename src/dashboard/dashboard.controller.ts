@@ -10,8 +10,8 @@ export class DashboardController {
   @Get('summary')
   getSummary(
     @CurrentUser('id') userId: string,
-    @Query() { year }: DashboardQueryDto,
+    @Query() { year, currency }: DashboardQueryDto,
   ) {
-    return this.dashboardService.getSummary(userId, year);
+    return this.dashboardService.getSummary(userId, year, currency);
   }
 }

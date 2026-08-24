@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { Currency } from 'src/common/enums/currency.enum';
 
 export class DashboardQueryDto {
   /**
@@ -13,4 +14,16 @@ export class DashboardQueryDto {
   @Min(2000)
   @Max(2100)
   year?: number;
+
+  /**
+   * Which currency the monthly chart is scoped to - the chart sums one
+   * currency at a time (see DashboardChartEntryDto), same reasoning as
+   * `totals`. Omitted, or a currency the user has no envelopes in,
+   * falls back to the user's most-used currency (see
+   * DashboardService.getSummary) - the actual currency used comes back
+   * as `chartCurrency` in the response either way.
+   */
+  @IsOptional()
+  @IsEnum(Currency)
+  currency?: Currency;
 }
