@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { DashboardRepository } from './repositories/dashboard.repository';
 import { DashboardSummaryResponseDto } from './dto/dashboard-summary-response.dto';
+import { DashboardRecentExpenseDto } from './dto/dashboard-recent-expense-response.dto';
 
 const CHART_MONTHS_LIMIT = 12;
+
+export const RECENT_EXPENSES_DEFAULT_LIMIT = 5;
 
 const MONTH_LABELS_ES = [
   'Ene',
@@ -90,6 +93,19 @@ export class DashboardService {
       chartCurrency,
       availableYears,
     };
+  }
+
+  /**
+   * Separate from getSummary above rather than folded into it - the
+   * Resumen page is the only caller (Estadísticas never renders this),
+   * so bundling it into the summary would mean an unused query running
+   * on every year/currency-filtered chart reload on that other page.
+   */
+  async getRecentExpenses(
+    userId: string,
+    limit: number = RECENT_EXPENSES_DEFAULT_LIMIT,
+  ): Promise<DashboardRecentExpenseDto[]> {
+    return this.dashboardRepository.getRecentExpenses(userId, limit);
   }
 }
 
