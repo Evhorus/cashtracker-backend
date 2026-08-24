@@ -26,24 +26,37 @@ export class DashboardService {
   async getSummary(
     userId: string,
     year?: number,
+    currency?: string,
   ): Promise<DashboardSummaryResponseDto> {
-    // getMonthlySpending needs to know the primary currency before it can
-    // run (see its own doc comment on why it's scoped to one currency),
-    // so this can't be a single Promise.all the way the three queries
-    // used to be - the aggregate has to resolve first.
+    // getMonthlySpending needs to know which currency to run against
+    // before it can run (see its own doc comment on why it's scoped to
+    // one currency), so this can't be a single Promise.all the way the
+    // three queries used to be - the aggregate has to resolve first.
     const currencyAggregates =
       await this.dashboardRepository.getSummaryAggregate(userId, year);
     // Already ordered by envelope count DESC - the same "most-used
     // currency" the summary totals put first.
     const primaryCurrency = currencyAggregates[0]?.currency;
+    // `currency` is a request to view a specific one (see
+    // dashboard-query.dto.ts) - honor it only if the user actually has
+    // envelopes in it, otherwise silently fall back to the primary one
+    // rather than querying a currency with nothing to show. Either way,
+    // `chartCurrency` in the response says which one was actually used,
+    // since the frontend can no longer just assume "primary".
+    const chartCurrency =
+      (currency &&
+        currencyAggregates.find((row) => row.currency === currency)
+          ?.currency) ||
+      primaryCurrency ||
+      null;
 
     const [monthlySpending, availableYears] = await Promise.all([
-      primaryCurrency
+      chartCurrency
         ? this.dashboardRepository.getMonthlySpending(
             userId,
             year,
             CHART_MONTHS_LIMIT,
-            primaryCurrency,
+            chartCurrency,
           )
         : Promise.resolve([]),
       this.dashboardRepository.getAvailableYears(userId),
@@ -74,6 +87,7 @@ export class DashboardService {
         spent: row.spent,
         available: row.available,
       })),
+      chartCurrency,
       availableYears,
     };
   }

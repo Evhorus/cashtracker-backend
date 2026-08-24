@@ -1,12 +1,9 @@
 /**
  * One bar's worth of chart data: total spent vs. still available
  * (summed across capped envelopes only) for one calendar month, e.g.
- * `label: "Ago 2026"`. Chronologically ascending.
- *
- * Still sums across every currency the user has, unlike
- * DashboardCurrencyTotalsDto below - a proper per-currency chart is a
- * bigger UI change (multiple charts, or a currency picker for it) than
- * this pass covers. Tracked as a known follow-up, not silently ignored.
+ * `label: "Ago 2026"`. Chronologically ascending. Scoped to one
+ * currency at a time - see `chartCurrency` on
+ * DashboardSummaryResponseDto for which one.
  */
 export class DashboardChartEntryDto {
   label: string;
@@ -53,6 +50,17 @@ export class DashboardSummaryResponseDto {
 
   /** Spending by month, most recent months, chronologically ascending. */
   chart: DashboardChartEntryDto[];
+
+  /**
+   * Which currency `chart` is scoped to - the requested `currency` query
+   * param (see DashboardQueryDto) if the user has envelopes in it,
+   * otherwise the user's most-used currency. Null when the user has no
+   * envelopes at all (chart is then also empty). The frontend's currency
+   * picker should reflect this, not just echo back what it requested -
+   * a request for a currency the user doesn't have silently falls back
+   * server-side rather than erroring or returning nothing.
+   */
+  chartCurrency: string | null;
 
   /** Distinct years the user has envelopes in, DESC - for a year picker. */
   availableYears: number[];
