@@ -1,6 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
+import { RecentExpensesQueryDto } from './dto/recent-expenses-query.dto';
 import { DashboardService } from './dashboard.service';
 
 @Controller('dashboard')
@@ -13,5 +14,13 @@ export class DashboardController {
     @Query() { year, currency }: DashboardQueryDto,
   ) {
     return this.dashboardService.getSummary(userId, year, currency);
+  }
+
+  @Get('recent-expenses')
+  getRecentExpenses(
+    @CurrentUser('id') userId: string,
+    @Query() { limit }: RecentExpensesQueryDto,
+  ) {
+    return this.dashboardService.getRecentExpenses(userId, limit);
   }
 }

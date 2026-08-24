@@ -11,6 +11,7 @@ describe('DashboardService', () => {
       getSummaryAggregate: jest.fn(),
       getMonthlySpending: jest.fn(),
       getAvailableYears: jest.fn(),
+      getRecentExpenses: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -172,6 +173,36 @@ describe('DashboardService', () => {
       // Assert
       expect(repository.getMonthlySpending).not.toHaveBeenCalled();
       expect(result.chart).toEqual([]);
+    });
+  });
+
+  describe('getRecentExpenses', () => {
+    it('defaults to RECENT_EXPENSES_DEFAULT_LIMIT when no limit is given', async () => {
+      repository.getRecentExpenses.mockResolvedValue([]);
+
+      await service.getRecentExpenses('user-123');
+
+      expect(repository.getRecentExpenses).toHaveBeenCalledWith('user-123', 5);
+    });
+
+    it('passes an explicit limit through to the repository', async () => {
+      const expenses = [
+        {
+          id: 'exp-1',
+          name: 'Supermercado Éxito',
+          amount: 85_000,
+          currency: 'COP',
+          date: new Date('2026-08-12'),
+          envelopeId: 'env-1',
+          envelopeName: 'Mercado',
+        },
+      ];
+      repository.getRecentExpenses.mockResolvedValue(expenses);
+
+      const result = await service.getRecentExpenses('user-123', 3);
+
+      expect(repository.getRecentExpenses).toHaveBeenCalledWith('user-123', 3);
+      expect(result).toEqual(expenses);
     });
   });
 });

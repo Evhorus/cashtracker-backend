@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Envelope } from '../../envelopes/entities/envelope.entity';
+import { Expense } from '../../expenses/entities/expense.entity';
 
 interface SummaryAggregateRow {
   currency: string;
@@ -9,6 +10,16 @@ interface SummaryAggregateRow {
   totalAssigned: string;
   totalSpent: string;
   cappedSpent: string;
+}
+
+interface RecentExpenseRow {
+  id: string;
+  name: string;
+  amount: string;
+  currency: string;
+  date: Date;
+  envelopeId: string;
+  envelopeName: string;
 }
 
 /**
@@ -22,6 +33,8 @@ export class DashboardRepository {
   constructor(
     @InjectRepository(Envelope)
     private readonly repository: Repository<Envelope>,
+    @InjectRepository(Expense)
+    private readonly expenseRepository: Repository<Expense>,
   ) {}
 
   private withUserAndYear(userId: string, year?: number) {
@@ -133,5 +146,41 @@ export class DashboardRepository {
       .getRawMany<{ year: string }>();
 
     return rows.map((row) => Number(row.year));
+  }
+
+  /**
+   * The `limit` most recent expenses across every envelope the user
+   * owns, most recent first (by date, then createdAt as a tiebreaker for
+   * same-day expenses) - powers the "Actividad reciente" widget on the
+   * Resumen page. Scoped via an inner join on envelope.userId rather
+   * than a separate envelope-ids-first query, same join style as
+   * getSummaryAggregate above.
+   */
+  async getRecentExpenses(userId: string, limit: number) {
+    const rows = await this.expenseRepository
+      .createQueryBuilder('expense')
+      .innerJoin('expense.envelope', 'envelope')
+      .where('envelope.userId = :userId', { userId })
+      .select('expense.id', 'id')
+      .addSelect('expense.name', 'name')
+      .addSelect('expense.amount', 'amount')
+      .addSelect('expense.currency', 'currency')
+      .addSelect('expense.date', 'date')
+      .addSelect('envelope.id', 'envelopeId')
+      .addSelect('envelope.name', 'envelopeName')
+      .orderBy('expense.date', 'DESC')
+      .addOrderBy('expense.createdAt', 'DESC')
+      .limit(limit)
+      .getRawMany<RecentExpenseRow>();
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      amount: Number(row.amount),
+      currency: row.currency,
+      date: row.date,
+      envelopeId: row.envelopeId,
+      envelopeName: row.envelopeName,
+    }));
   }
 }
