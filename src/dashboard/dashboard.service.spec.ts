@@ -58,6 +58,41 @@ describe('DashboardService', () => {
           totalEnvelopes: 3,
           totalAssigned: 1_000_000,
           totalSpent: 400_000,
+          totalSpentCapped: 400_000,
+          totalAvailable: 600_000,
+        },
+      ]);
+    });
+
+    it("should keep totalSpentCapped (not totalSpent) as what totalAvailable is actually derived from, so an unlimited envelope's spending never makes the two look inconsistent", async () => {
+      // Arrange - one currency where an uncapped envelope's spending
+      // makes totalSpent (400_000 + 150_000) bigger than totalAssigned
+      // itself. If totalAvailable were derived from totalSpent instead
+      // of totalSpentCapped, it would go negative even though the
+      // capped envelope is nowhere near its limit.
+      repository.getSummaryAggregate.mockResolvedValue([
+        {
+          currency: 'COP',
+          count: 2,
+          totalAssigned: 1_000_000,
+          totalSpent: 550_000,
+          cappedSpent: 400_000,
+        },
+      ]);
+      repository.getMonthlySpending.mockResolvedValue([]);
+      repository.getAvailableYears.mockResolvedValue([2026]);
+
+      // Act
+      const result = await service.getSummary('user-123');
+
+      // Assert
+      expect(result.totals).toEqual([
+        {
+          currency: 'COP',
+          totalEnvelopes: 2,
+          totalAssigned: 1_000_000,
+          totalSpent: 550_000,
+          totalSpentCapped: 400_000,
           totalAvailable: 600_000,
         },
       ]);
@@ -96,6 +131,7 @@ describe('DashboardService', () => {
           totalEnvelopes: 2,
           totalAssigned: 1_000_000,
           totalSpent: 400_000,
+          totalSpentCapped: 400_000,
           totalAvailable: 600_000,
         },
         {
@@ -103,6 +139,7 @@ describe('DashboardService', () => {
           totalEnvelopes: 1,
           totalAssigned: 500,
           totalSpent: 100,
+          totalSpentCapped: 100,
           totalAvailable: 400,
         },
       ]);

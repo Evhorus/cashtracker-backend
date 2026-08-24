@@ -83,6 +83,7 @@ export class DashboardService {
         totalEnvelopes: row.count,
         totalAssigned: row.totalAssigned,
         totalSpent: row.totalSpent,
+        totalSpentCapped: row.cappedSpent,
         totalAvailable: row.totalAssigned - row.cappedSpent,
       })),
       chart: monthlySpending.map((row) => ({

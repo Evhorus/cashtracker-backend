@@ -27,10 +27,21 @@ export class DashboardCurrencyTotalsDto {
   /** Sum of `amount` across envelopes in this currency that have a spending limit. */
   totalAssigned: number;
 
-  /** Sum of `spent` across every envelope in this currency, capped or not. */
+  /** Sum of `spent` across every envelope in this currency, capped or not.
+   * Not the number to compare against totalAssigned/totalAvailable -
+   * those only ever count capped envelopes, so an unlimited envelope's
+   * spend would make totalSpent look inconsistent with them (e.g.
+   * totalSpent exceeding totalAssigned even though every capped
+   * envelope is well under its limit). Use totalSpentCapped for
+   * anything shown alongside the budget figures. */
   totalSpent: number;
 
-  /** totalAssigned minus spent, counting only capped envelopes, for this currency. */
+  /** Sum of `spent` across only the capped envelopes in this currency -
+   * the portion of totalSpent that actually counts against
+   * totalAssigned. totalAvailable = totalAssigned - totalSpentCapped. */
+  totalSpentCapped: number;
+
+  /** totalAssigned minus totalSpentCapped, for this currency. */
   totalAvailable: number;
 }
 
