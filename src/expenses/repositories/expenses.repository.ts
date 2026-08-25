@@ -80,7 +80,11 @@ export class ExpensesRepository {
       );
     }
 
-    const sortOrder = filters.sort || 'ASC';
+    // Most recent first by default - the conventional order for a
+    // transaction/expense history (what did I just spend, not what did
+    // I spend first), and what the frontend's own "Actividad reciente"
+    // dashboard widget already assumes for expenses.
+    const sortOrder = filters.sort || 'DESC';
     query.orderBy('expense.date', sortOrder);
     query.addOrderBy('expense.createdAt', 'DESC');
     query.skip((page - 1) * limit).take(limit);
