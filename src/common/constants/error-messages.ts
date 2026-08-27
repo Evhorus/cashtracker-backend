@@ -17,6 +17,10 @@ export const ERROR_MESSAGES = {
   EXPENSE_NOT_FOUND: 'Expense not found',
   EXPENSE_INVALID_UUID: 'Invalid expense ID format',
 
+  // Category errors
+  CATEGORY_NOT_FOUND: 'Category not found',
+  CATEGORY_ALREADY_EXISTS: 'Ya tienes una categoría con ese nombre',
+
   // Validation errors
   AMOUNT_MUST_BE_POSITIVE: 'Amount must be greater than 0',
   INVALID_DATE_FORMAT: 'Date must be in YYYY-MM-DD format',

@@ -10,6 +10,7 @@ import { DatabaseModule } from './database/database.module';
 
 import { ExpensesModule } from './expenses/expenses.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     EnvelopesModule,
     ExpensesModule,
     DashboardModule,
+    CategoriesModule,
     HealthCheckModule,
     AuthModule,
   ],
