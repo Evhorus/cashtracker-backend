@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsPositive,
   IsString,
+  IsUUID,
 } from 'class-validator';
 import { normalizeString } from 'src/common/utils/string-utils';
 import { Currency } from 'src/common/enums/currency.enum';
@@ -30,12 +31,20 @@ export class CreateEnvelopeDto {
   @Transform(({ value }) => normalizeString(value))
   description?: string;
 
+  /**
+   * A category id, not a label - `envelope.category` used to be free
+   * text, which meant renaming a category silently detached every
+   * envelope using it (see migration 1787950000000). `null` explicitly
+   * clears it; omitted leaves it unchanged on an update.
+   *
+   * Ownership is checked in the service, not here: a well-formed uuid
+   * belonging to somebody else must be rejected, and a DTO can't see who
+   * is asking.
+   */
   @IsOptional()
-  @IsString()
-  @Transform(({ value }) => {
-    // Convert empty strings to undefined for optional fields
-    if (value === '' || value === null) return undefined;
-    return normalizeString(value);
-  })
-  category?: string;
+  @IsUUID()
+  @Transform(({ value }: { value: unknown }) =>
+    value === '' ? null : (value as string | null),
+  )
+  categoryId?: string | null;
 }

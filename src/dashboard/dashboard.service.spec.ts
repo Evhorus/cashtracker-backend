@@ -244,7 +244,17 @@ describe('DashboardService', () => {
       // the database's job, and reshaping rows in between would be a
       // second place for the numbers to change.
       const rows = [
-        { category: 'Hogar', spent: 1_525_500, envelopeCount: 4 },
+        {
+          category: {
+            id: 'cat-1',
+            label: 'Hogar',
+            color: 'oklch(0.72 0.14 153)',
+            icon: 'house',
+          },
+          spent: 1_525_500,
+          envelopeCount: 4,
+        },
+        // Envelopes with no category group into a single null row.
         { category: null, spent: 12_012, envelopeCount: 1 },
       ];
       repository.getCategoryBreakdown.mockResolvedValue(rows);

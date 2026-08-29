@@ -1,4 +1,5 @@
 import { Envelope } from '../entities/envelope.entity';
+import { EnvelopeCategoryDto } from './envelope-category.dto';
 import {
   deriveEnvelopeStatus,
   type EnvelopeProgressStatus,
@@ -20,7 +21,9 @@ export class EnvelopeResponseDto {
    * threshold - see utils/envelope-status.ts.
    */
   status: EnvelopeProgressStatus;
-  category?: string;
+  /** The whole category, or null when unclassified - see
+   * EnvelopeCategoryDto. */
+  category: EnvelopeCategoryDto | null;
   description?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -38,7 +41,7 @@ export class EnvelopeResponseDto {
       currency: envelope.currency,
       spent: envelope.spent,
       status: deriveEnvelopeStatus(envelope.amount, envelope.spent),
-      category: envelope.category,
+      category: EnvelopeCategoryDto.fromEntity(envelope.category),
       description: envelope.description,
       createdAt: envelope.createdAt,
       updatedAt: envelope.updatedAt,

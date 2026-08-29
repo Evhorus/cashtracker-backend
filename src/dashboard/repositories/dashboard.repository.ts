@@ -50,42 +50,61 @@ export class DashboardRepository {
   }
 
   /**
-   * Aggregate query grouped by `envelope.category`: sum of `spent` and
-   * envelope count, one row per category the user actually has
-   * envelopes in. Scoped to a single currency, for the same reason the
-   * chart is - summing money across currencies is meaningless.
+   * Aggregate query grouped by category: sum of `spent` and envelope
+   * count, one row per category the user actually has envelopes in.
+   * Scoped to a single currency, for the same reason the chart is -
+   * summing money across currencies is meaningless.
    *
-   * Exists so the category breakdown doesn't have to fetch every
-   * envelope and reduce over it client-side, which was capped at the
-   * list endpoint's 100 and therefore silently dropped categories for a
-   * large account. Rows come back ordered by spend, descending, which is
-   * how the UI renders them.
+   * Exists so the breakdown doesn't have to fetch every envelope and
+   * reduce over it client-side, which was capped at the list endpoint's
+   * 100 and silently dropped categories for a large account.
    *
-   * `category` is free text on the envelope, not a foreign key, so this
-   * groups by that text: two spellings of the same idea are two rows,
-   * exactly as they already appeared in the UI. `null` (no category set)
-   * comes back as its own row with `category: null` - the caller decides
-   * how to label it.
+   * Groups by the category's id now that it is a real relation. When it
+   * was free text this grouped by the string, so two spellings of one
+   * category were two rows and the client had to re-merge them - that
+   * whole step is gone. Envelopes with no category group into a single
+   * `category: null` row; the caller decides how to label it.
+   *
+   * The label/colour/icon come back with each row so the caller can
+   * render the chip without a second lookup, matching how envelope
+   * responses embed their category.
    */
   async getCategoryBreakdown(userId: string, currency: string, year?: number) {
     const rows = await this.withUserAndYear(userId, year)
+      .leftJoin('envelope.category', 'category')
       .andWhere('envelope.currency = :currency', { currency })
       // Envelopes with nothing spent contribute nothing to a breakdown
       // of spending, and would render as 0% rows.
       .andWhere('envelope.spent > 0')
-      .select('envelope.category', 'category')
+      .select('category.id', 'categoryId')
+      .addSelect('category.label', 'label')
+      .addSelect('category.color', 'color')
+      .addSelect('category.icon', 'icon')
       .addSelect('COALESCE(SUM(envelope.spent), 0)', 'spent')
       .addSelect('COUNT(*)', 'envelopeCount')
-      .groupBy('envelope.category')
+      .groupBy('category.id')
+      .addGroupBy('category.label')
+      .addGroupBy('category.color')
+      .addGroupBy('category.icon')
       .orderBy('SUM(envelope.spent)', 'DESC')
       .getRawMany<{
-        category: string | null;
+        categoryId: string | null;
+        label: string | null;
+        color: string | null;
+        icon: string | null;
         spent: string;
         envelopeCount: string;
       }>();
 
     return rows.map((row) => ({
-      category: row.category,
+      category: row.categoryId
+        ? {
+            id: row.categoryId,
+            label: row.label as string,
+            color: row.color as string,
+            icon: row.icon as string,
+          }
+        : null,
       spent: Number(row.spent),
       envelopeCount: Number(row.envelopeCount),
     }));

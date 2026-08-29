@@ -3,11 +3,25 @@ import { NotFoundException } from '@nestjs/common';
 import { EnvelopesService } from './envelopes.service';
 import { EnvelopesRepository } from './repositories/envelopes.repository';
 import { Envelope } from './entities/envelope.entity';
+import { Category } from '../categories/entities/category.entity';
+import { Currency } from '../common/enums/currency.enum';
+import { CategoriesRepository } from '../categories/repositories/categories.repository';
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
 
 describe('EnvelopesService', () => {
   let service: EnvelopesService;
   let repository: jest.Mocked<EnvelopesRepository>;
+
+  const mockCategory: Category = {
+    id: 'cat-1',
+    userId: 'user-123',
+    label: 'Food',
+    color: 'oklch(0.72 0.14 153)',
+    icon: 'utensils',
+    isDefault: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
 
   const mockEnvelope: Envelope = {
     id: 'envelope-123',
@@ -16,7 +30,8 @@ describe('EnvelopesService', () => {
     currency: 'COP',
     spent: 200,
     userId: 'user-123',
-    category: 'Food',
+    category: mockCategory,
+    categoryId: mockCategory.id,
     description: 'Monthly groceries',
     expenses: [],
     createdAt: new Date(),
@@ -37,6 +52,14 @@ describe('EnvelopesService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EnvelopesService,
+        {
+          provide: CategoriesRepository,
+          useValue: {
+            // Envelopes validate the category id against what the user
+            // may see - see EnvelopesService.assertCategoryIsUsable.
+            findVisibleForUserById: jest.fn().mockResolvedValue(mockCategory),
+          },
+        },
         {
           provide: EnvelopesRepository,
           useValue: mockRepo,
@@ -59,8 +82,8 @@ describe('EnvelopesService', () => {
       const createDto = {
         name: 'Groceries',
         amount: 500,
-        currency: 'COP',
-        category: 'Food',
+        currency: Currency.COP,
+        categoryId: mockCategory.id,
         description: 'Monthly groceries',
       };
       repository.create.mockResolvedValue(mockEnvelope);
@@ -82,7 +105,7 @@ describe('EnvelopesService', () => {
       const userId = 'user-123';
       const createDto = {
         name: 'Unlimited Tracking',
-        currency: 'COP',
+        currency: Currency.COP,
       };
       repository.create.mockResolvedValue({
         ...mockEnvelope,
