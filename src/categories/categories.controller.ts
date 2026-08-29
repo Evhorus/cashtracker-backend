@@ -26,6 +26,15 @@ export class CategoriesController {
     return CategoryResponseDto.fromEntities(categories);
   }
 
+  /**
+   * Registered before any ':categoryId' route would be, so "usage" is
+   * never parsed as an id.
+   */
+  @Get('usage')
+  countEnvelopesByCategory(@CurrentUser('id') userId: string) {
+    return this.categoriesService.countEnvelopesByCategory(userId);
+  }
+
   // Static (same for every user) - registered before the userId-scoped
   // GET routes below would matter if there were a GET(':categoryId'),
   // but there isn't one, so ordering relative to those doesn't actually

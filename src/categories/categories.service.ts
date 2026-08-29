@@ -7,6 +7,7 @@ import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CategoriesRepository } from './repositories/categories.repository';
+import { CategoryUsageDto } from './dto/category-usage-response.dto';
 import { ICON_KEYS } from './constants/icon-keys';
 import { PRESET_COLORS } from './constants/preset-colors';
 
@@ -34,6 +35,15 @@ export class CategoriesService {
    */
   async findAllForUser(userId: string) {
     return this.categoriesRepository.findVisibleForUser(userId);
+  }
+
+  /**
+   * Envelope counts per category - see
+   * CategoriesRepository.countEnvelopesByCategory for why this is
+   * separate from findAllForUser and from the dashboard breakdown.
+   */
+  async countEnvelopesByCategory(userId: string): Promise<CategoryUsageDto[]> {
+    return this.categoriesRepository.countEnvelopesByCategory(userId);
   }
 
   async create(userId: string, createCategoryDto: CreateCategoryDto) {
