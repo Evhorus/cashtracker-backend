@@ -486,12 +486,16 @@ describe('Envelopes (e2e)', () => {
       expect(byName.get('unlimited')).toBe('unlimited');
     });
 
-    it('filters "active" to limited envelopes not yet over', async () => {
-      expect(await namesFor('active')).toEqual([
-        'at-limit',
-        'normal',
-        'warning',
-      ]);
+    // One filter per status, so a client's tabs can be labelled with the
+    // status words themselves instead of a second vocabulary. `at-limit`
+    // lands in "warning" rather than "normal": spent === amount is at
+    // 100% of the limit, past the 80% threshold but not over.
+    it('filters "normal" to limited envelopes below the threshold', async () => {
+      expect(await namesFor('normal')).toEqual(['normal']);
+    });
+
+    it('filters "warning" to those at or past the threshold but not over', async () => {
+      expect(await namesFor('warning')).toEqual(['at-limit', 'warning']);
     });
 
     it('filters "alert" to warning and exceeded', async () => {
