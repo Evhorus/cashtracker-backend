@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { assertSafeTestDatabase } from './assert-safe-test-database';
 import { DataSource } from 'typeorm';
 import { ClerkAuthGuard } from '../src/auth/guards/clerk-auth.guard';
 import { ThrottlerGuard } from '@nestjs/throttler';
@@ -15,6 +16,9 @@ describe('Expenses (e2e)', () => {
   };
 
   beforeAll(async () => {
+    // Before any connection is opened - these suites wipe tables.
+    assertSafeTestDatabase();
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -45,10 +49,9 @@ describe('Expenses (e2e)', () => {
   });
 
   afterEach(async () => {
-    // Safety check: Never delete data if not in test environment
-    if (process.env.NODE_ENV !== 'test') {
-      return;
-    }
+    // The real safety check is assertSafeTestDatabase() in beforeAll -
+    // a NODE_ENV check here proved nothing, since test:e2e sets
+    // NODE_ENV=test itself.
     await dataSource.query('DELETE FROM expense');
     await dataSource.query('DELETE FROM envelope');
   });
