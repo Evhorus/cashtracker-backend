@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DashboardRepository } from './repositories/dashboard.repository';
 import { DashboardSummaryResponseDto } from './dto/dashboard-summary-response.dto';
+import { DashboardCategoryBreakdownDto } from './dto/dashboard-category-breakdown-response.dto';
 import { DashboardRecentExpenseDto } from './dto/dashboard-recent-expense-response.dto';
 
 const CHART_MONTHS_LIMIT = 12;
@@ -94,6 +95,26 @@ export class DashboardService {
       chartCurrency,
       availableYears,
     };
+  }
+
+  /**
+   * Spending grouped by category for one currency - the "Gasto por
+   * categoría" widget on Estadísticas.
+   *
+   * Its own endpoint rather than part of the summary: Resumen never
+   * renders it, so folding it in would run an extra GROUP BY on every
+   * dashboard load. Same reasoning as getRecentExpenses below.
+   */
+  async getCategoryBreakdown(
+    userId: string,
+    currency: string,
+    year?: number,
+  ): Promise<DashboardCategoryBreakdownDto[]> {
+    return this.dashboardRepository.getCategoryBreakdown(
+      userId,
+      currency,
+      year,
+    );
   }
 
   /**

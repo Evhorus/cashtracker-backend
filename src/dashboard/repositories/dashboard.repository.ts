@@ -50,6 +50,48 @@ export class DashboardRepository {
   }
 
   /**
+   * Aggregate query grouped by `envelope.category`: sum of `spent` and
+   * envelope count, one row per category the user actually has
+   * envelopes in. Scoped to a single currency, for the same reason the
+   * chart is - summing money across currencies is meaningless.
+   *
+   * Exists so the category breakdown doesn't have to fetch every
+   * envelope and reduce over it client-side, which was capped at the
+   * list endpoint's 100 and therefore silently dropped categories for a
+   * large account. Rows come back ordered by spend, descending, which is
+   * how the UI renders them.
+   *
+   * `category` is free text on the envelope, not a foreign key, so this
+   * groups by that text: two spellings of the same idea are two rows,
+   * exactly as they already appeared in the UI. `null` (no category set)
+   * comes back as its own row with `category: null` - the caller decides
+   * how to label it.
+   */
+  async getCategoryBreakdown(userId: string, currency: string, year?: number) {
+    const rows = await this.withUserAndYear(userId, year)
+      .andWhere('envelope.currency = :currency', { currency })
+      // Envelopes with nothing spent contribute nothing to a breakdown
+      // of spending, and would render as 0% rows.
+      .andWhere('envelope.spent > 0')
+      .select('envelope.category', 'category')
+      .addSelect('COALESCE(SUM(envelope.spent), 0)', 'spent')
+      .addSelect('COUNT(*)', 'envelopeCount')
+      .groupBy('envelope.category')
+      .orderBy('SUM(envelope.spent)', 'DESC')
+      .getRawMany<{
+        category: string | null;
+        spent: string;
+        envelopeCount: string;
+      }>();
+
+    return rows.map((row) => ({
+      category: row.category,
+      spent: Number(row.spent),
+      envelopeCount: Number(row.envelopeCount),
+    }));
+  }
+
+  /**
    * Aggregate query grouped by currency: envelope count, sum of assigned
    * amounts (capped envelopes only), sum of spent (all envelopes), and
    * sum of spent restricted to capped envelopes (needed to compute
