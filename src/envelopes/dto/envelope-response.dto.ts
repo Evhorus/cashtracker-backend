@@ -1,4 +1,8 @@
 import { Envelope } from '../entities/envelope.entity';
+import {
+  deriveEnvelopeStatus,
+  type EnvelopeProgressStatus,
+} from '../utils/envelope-status';
 
 /**
  * Response DTO for Envelope entity
@@ -10,6 +14,12 @@ export class EnvelopeResponseDto {
   amount: number | null;
   currency: string;
   spent: number;
+  /**
+   * Derived from `amount` and `spent`, not stored. Reported here so every
+   * client renders the same status instead of each one reimplementing the
+   * threshold - see utils/envelope-status.ts.
+   */
+  status: EnvelopeProgressStatus;
   category?: string;
   description?: string;
   createdAt: Date;
@@ -27,6 +37,7 @@ export class EnvelopeResponseDto {
       amount: envelope.amount,
       currency: envelope.currency,
       spent: envelope.spent,
+      status: deriveEnvelopeStatus(envelope.amount, envelope.spent),
       category: envelope.category,
       description: envelope.description,
       createdAt: envelope.createdAt,

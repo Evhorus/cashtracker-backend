@@ -6,6 +6,7 @@ import { EnvelopeWithExpensesResponseDto } from './dto/envelope-with-expenses-re
 import { CreateEnvelopeDto } from './dto/create-envelope.dto';
 import { UpdateEnvelopeDto } from './dto/update-envelope.dto';
 import { EnvelopesRepository } from './repositories/envelopes.repository';
+import { type EnvelopeStatusFilter } from './utils/envelope-status';
 
 @Injectable()
 export class EnvelopesService {
@@ -25,20 +26,21 @@ export class EnvelopesService {
 
   /**
    * Find all envelopes without expenses (light query for list view),
-   * paginated (page is 1-indexed). `search` optionally filters by
-   * name/category.
+   * paginated (page is 1-indexed). `filters.search` optionally filters
+   * by name/category; `filters.status` by derived spending status, in
+   * SQL, so `total` reflects the filtered set.
    */
   async findAllLight(
     userId: string,
     page: number,
     limit: number,
-    search?: string,
+    filters: { search?: string; status?: EnvelopeStatusFilter } = {},
   ) {
     const [envelopes, total] = await this.envelopesRepository.findByUserIdLight(
       userId,
       page,
       limit,
-      search,
+      filters,
     );
 
     return new PaginatedResponseDto(

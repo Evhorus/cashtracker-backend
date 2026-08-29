@@ -1,5 +1,9 @@
 import { Envelope } from '../entities/envelope.entity';
 import { ExpenseResponseDto } from '../../expenses/dto/expense-response.dto';
+import {
+  deriveEnvelopeStatus,
+  type EnvelopeProgressStatus,
+} from '../utils/envelope-status';
 
 /**
  * Response DTO for Envelope with expenses
@@ -11,6 +15,9 @@ export class EnvelopeWithExpensesResponseDto {
   amount: number | null;
   currency: string;
   spent: number;
+  /** See EnvelopeResponseDto.status - same field, so a client never has
+   * to derive it for one endpoint and read it from another. */
+  status: EnvelopeProgressStatus;
   category?: string;
   description?: string;
   expenses: ExpenseResponseDto[];
@@ -29,6 +36,7 @@ export class EnvelopeWithExpensesResponseDto {
       amount: envelope.amount,
       currency: envelope.currency,
       spent: envelope.spent,
+      status: deriveEnvelopeStatus(envelope.amount, envelope.spent),
       category: envelope.category,
       description: envelope.description,
       expenses: envelope.expenses

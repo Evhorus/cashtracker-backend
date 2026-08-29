@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { Envelope } from '../entities/envelope.entity';
+import {
+  buildEnvelopeStatusPredicate,
+  type EnvelopeStatusFilter,
+} from '../utils/envelope-status';
 
 /**
  * Custom repository for Envelope entity
@@ -27,7 +31,7 @@ export class EnvelopesRepository {
     userId: string,
     page: number,
     limit: number,
-    search?: string,
+    filters: { search?: string; status?: EnvelopeStatusFilter } = {},
   ) {
     const query = this.repository
       .createQueryBuilder('envelope')
@@ -44,11 +48,22 @@ export class EnvelopesRepository {
         'envelope.updatedAt',
       ]);
 
-    if (search) {
+    if (filters.search) {
       query.andWhere(
         '(LOWER(envelope.name) LIKE LOWER(:search) OR LOWER(envelope.category) LIKE LOWER(:search))',
-        { search: `%${search}%` },
+        { search: `%${filters.search}%` },
       );
+    }
+
+    // Status is derived from amount/spent, so it filters in SQL rather
+    // than in memory - which is what keeps getManyAndCount()'s total
+    // honest. The web client used to fetch every envelope (capped at 100)
+    // and filter client-side, silently under-reporting past that cap.
+    if (filters.status) {
+      const predicate = buildEnvelopeStatusPredicate(filters.status);
+      if (predicate) {
+        query.andWhere(`(${predicate.clause})`, predicate.params);
+      }
     }
 
     query.orderBy('envelope.createdAt', 'DESC');

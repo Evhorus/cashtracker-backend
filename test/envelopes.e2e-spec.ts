@@ -354,4 +354,141 @@ describe('Envelopes (e2e)', () => {
       expect(expenses).toHaveLength(0);
     });
   });
+
+  /**
+   * The status filter, executed by Postgres rather than transcribed to
+   * JS. envelope-status.spec.ts already proves the SQL predicate and the
+   * TypeScript derivation agree in their reasoning; only a real database
+   * can prove the SQL is valid and that Postgres evaluates it the same
+   * way - `decimal` comparisons and `amount * :threshold` in particular.
+   *
+   * Spends are set by posting expenses, the same path the app uses, so
+   * `spent` is maintained by the service instead of being written
+   * directly.
+   */
+  describe('/envelopes?status= (GET)', () => {
+    /** Creates an envelope and spends `spent` against it. */
+    async function seed(
+      name: string,
+      amount: number | null,
+      spent: number,
+    ): Promise<string> {
+      const created = await request(app.getHttpServer())
+        .post('/envelopes')
+        .send({ name, amount, currency: 'COP' })
+        .expect(201);
+
+      const list = await request(app.getHttpServer())
+        .get('/envelopes')
+        .query({ limit: 100 })
+        .expect(200);
+
+      const envelope = (
+        list.body as { data: { id: string; name: string }[] }
+      ).data.find((e) => e.name === name);
+      if (!envelope) throw new Error(`seed failed for ${name}`);
+      expect(created.body).toBeDefined();
+
+      if (spent > 0) {
+        await request(app.getHttpServer())
+          .post(`/envelopes/${envelope.id}/expenses`)
+          .send({
+            name: `${name} gasto`,
+            amount: spent,
+            currency: 'COP',
+            date: '2026-08-20',
+          })
+          .expect(201);
+      }
+
+      return envelope.id;
+    }
+
+    async function namesFor(status: string): Promise<string[]> {
+      const res = await request(app.getHttpServer())
+        .get('/envelopes')
+        .query({ status, limit: 100 })
+        .expect(200);
+      const body = res.body as {
+        data: { name: string }[];
+        meta: { total: number };
+      };
+      // total must reflect the filter, not the unfiltered count - that is
+      // the whole reason this filters in SQL.
+      expect(body.meta.total).toBe(body.data.length);
+      return body.data.map((e) => e.name).sort();
+    }
+
+    beforeEach(async () => {
+      await seed('normal', 1000, 100); // 10%
+      await seed('warning', 1000, 850); // 85%
+      await seed('at-limit', 1000, 1000); // 100% -> still warning
+      await seed('exceeded', 1000, 1200); // 120%
+      await seed('unlimited', null, 500);
+    });
+
+    it('reports the derived status on every envelope', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/envelopes')
+        .query({ limit: 100 })
+        .expect(200);
+
+      const byName = new Map(
+        (res.body as { data: { name: string; status: string }[] }).data.map(
+          (e) => [e.name, e.status],
+        ),
+      );
+
+      expect(byName.get('normal')).toBe('normal');
+      expect(byName.get('warning')).toBe('warning');
+      expect(byName.get('at-limit')).toBe('warning');
+      expect(byName.get('exceeded')).toBe('exceeded');
+      expect(byName.get('unlimited')).toBe('unlimited');
+    });
+
+    it('filters "active" to limited envelopes not yet over', async () => {
+      expect(await namesFor('active')).toEqual([
+        'at-limit',
+        'normal',
+        'warning',
+      ]);
+    });
+
+    it('filters "alert" to warning and exceeded', async () => {
+      expect(await namesFor('alert')).toEqual([
+        'at-limit',
+        'exceeded',
+        'warning',
+      ]);
+    });
+
+    it('filters "exceeded" to only those past the limit', async () => {
+      expect(await namesFor('exceeded')).toEqual(['exceeded']);
+    });
+
+    it('filters "unlimited" to envelopes with no cap', async () => {
+      expect(await namesFor('unlimited')).toEqual(['unlimited']);
+    });
+
+    it('returns everything for "all"', async () => {
+      expect(await namesFor('all')).toHaveLength(5);
+    });
+
+    it('rejects an unknown status instead of ignoring it', async () => {
+      await request(app.getHttpServer())
+        .get('/envelopes')
+        .query({ status: 'bogus' })
+        .expect(400);
+    });
+
+    it('combines status with search', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/envelopes')
+        .query({ status: 'alert', search: 'exceed' })
+        .expect(200);
+
+      const body = res.body as { data: { name: string }[] };
+      expect(body.data.map((e) => e.name)).toEqual(['exceeded']);
+    });
+  });
 });
