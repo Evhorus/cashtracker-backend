@@ -62,11 +62,10 @@ describe('statusMatchesFilter', () => {
     }
   });
 
-  it('groups the unions the way their consumers expect', () => {
-    expect(statusMatchesFilter('normal', 'active')).toBe(true);
-    expect(statusMatchesFilter('warning', 'active')).toBe(true);
-    expect(statusMatchesFilter('exceeded', 'active')).toBe(false);
-
+  it('groups warning and exceeded under "alert", and nothing else', () => {
+    // The one union left. `active` (normal + warning) was removed: no
+    // consumer, and no word named it honestly - an envelope is never
+    // activated or deactivated.
     expect(statusMatchesFilter('warning', 'alert')).toBe(true);
     expect(statusMatchesFilter('exceeded', 'alert')).toBe(true);
     expect(statusMatchesFilter('normal', 'alert')).toBe(false);
@@ -107,9 +106,6 @@ describe('SQL predicate agrees with the TypeScript derivation', () => {
     exceeded: (amount, spent) =>
       amount !== null &&
       ((amount > 0 && spent > amount) || (amount <= 0 && spent > 0)),
-    active: (amount, spent) =>
-      amount !== null &&
-      ((amount > 0 && spent <= amount) || (amount <= 0 && spent <= 0)),
     normal: (amount, spent) =>
       amount !== null &&
       ((amount > 0 && spent < amount * THRESHOLD) ||
