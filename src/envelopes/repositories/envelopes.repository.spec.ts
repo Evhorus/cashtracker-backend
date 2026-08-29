@@ -3,11 +3,23 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EnvelopesRepository } from './envelopes.repository';
 import { Envelope } from '../entities/envelope.entity';
+import { Category } from '../../categories/entities/category.entity';
 import { ENVELOPE_WARNING_THRESHOLD } from '../utils/envelope-status';
 
 describe('EnvelopesRepository', () => {
   let repository: EnvelopesRepository;
   let mockRepository: jest.Mocked<Repository<Envelope>>;
+
+  const mockCategory: Category = {
+    id: 'cat-1',
+    userId: 'user-123',
+    label: 'Food',
+    color: 'oklch(0.72 0.14 153)',
+    icon: 'utensils',
+    isDefault: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
 
   const mockEnvelope: Envelope = {
     id: 'envelope-123',
@@ -16,7 +28,8 @@ describe('EnvelopesRepository', () => {
     currency: 'COP',
     spent: 200,
     userId: 'user-123',
-    category: 'Food',
+    category: mockCategory,
+    categoryId: mockCategory.id,
     description: 'Monthly groceries',
     expenses: [],
     createdAt: new Date(),
@@ -27,6 +40,7 @@ describe('EnvelopesRepository', () => {
   // real QueryBuilder, so findByUserIdLight's chained calls resolve to it.
   let mockQueryBuilder: {
     where: jest.Mock;
+    leftJoin: jest.Mock;
     andWhere: jest.Mock;
     select: jest.Mock;
     orderBy: jest.Mock;
@@ -38,6 +52,7 @@ describe('EnvelopesRepository', () => {
   beforeEach(async () => {
     mockQueryBuilder = {
       where: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
@@ -128,7 +143,7 @@ describe('EnvelopesRepository', () => {
 
       // Assert
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        '(LOWER(envelope.name) LIKE LOWER(:search) OR LOWER(envelope.category) LIKE LOWER(:search))',
+        '(LOWER(envelope.name) LIKE LOWER(:search) OR LOWER(category.label) LIKE LOWER(:search))',
         { search: '%grocer%' },
       );
     });
@@ -214,19 +229,24 @@ describe('EnvelopesRepository', () => {
     it('should find envelope by id', async () => {
       // Arrange
       const id = 'envelope-123';
-      mockRepository.findOneBy.mockResolvedValue(mockEnvelope);
+      mockRepository.findOne.mockResolvedValue(mockEnvelope);
 
       // Act
       const result = await repository.findById(id);
 
       // Assert
       expect(result).toEqual(mockEnvelope);
-      expect(mockRepository.findOneBy).toHaveBeenCalledWith({ id });
+      // findOne with a relation now, not findOneBy - the envelope's
+      // category has to travel with it so responses can embed it.
+      expect(mockRepository.findOne).toHaveBeenCalledWith({
+        where: { id },
+        relations: { category: true },
+      });
     });
 
     it('should return null if envelope not found', async () => {
       // Arrange
-      mockRepository.findOneBy.mockResolvedValue(null);
+      mockRepository.findOne.mockResolvedValue(null);
 
       // Act
       const result = await repository.findById('non-existent');

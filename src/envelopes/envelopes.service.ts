@@ -6,13 +6,42 @@ import { EnvelopeWithExpensesResponseDto } from './dto/envelope-with-expenses-re
 import { CreateEnvelopeDto } from './dto/create-envelope.dto';
 import { UpdateEnvelopeDto } from './dto/update-envelope.dto';
 import { EnvelopesRepository } from './repositories/envelopes.repository';
+import { CategoriesRepository } from '../categories/repositories/categories.repository';
 import { type EnvelopeStatusFilter } from './utils/envelope-status';
 
 @Injectable()
 export class EnvelopesService {
-  constructor(private readonly envelopesRepository: EnvelopesRepository) {}
+  constructor(
+    private readonly envelopesRepository: EnvelopesRepository,
+    private readonly categoriesRepository: CategoriesRepository,
+  ) {}
+
+  /**
+   * Envelopes reference categories by id now, so a well-formed uuid
+   * belonging to another user has to be rejected here - the DTO can
+   * validate the shape but not who is asking. `null` clears the
+   * category and is always allowed; `undefined` means "leave it alone"
+   * on an update and is passed through untouched.
+   */
+  private async assertCategoryIsUsable(
+    userId: string,
+    categoryId: string | null | undefined,
+  ) {
+    if (!categoryId) return;
+
+    const category = await this.categoriesRepository.findVisibleForUserById(
+      userId,
+      categoryId,
+    );
+
+    if (!category) {
+      throw new NotFoundException(ERROR_MESSAGES.CATEGORY_NOT_FOUND);
+    }
+  }
 
   async create(userId: string, createEnvelopeDto: CreateEnvelopeDto) {
+    await this.assertCategoryIsUsable(userId, createEnvelopeDto.categoryId);
+
     await this.envelopesRepository.create({
       ...createEnvelopeDto,
       spent: 0,
@@ -72,7 +101,11 @@ export class EnvelopesService {
   }
 
   async update(id: string, updateEnvelopeDto: UpdateEnvelopeDto) {
-    await this.findOne(id);
+    const envelope = await this.findOne(id);
+    await this.assertCategoryIsUsable(
+      envelope.userId,
+      updateEnvelopeDto.categoryId,
+    );
     await this.envelopesRepository.update(id, updateEnvelopeDto);
     return {
       message: 'Sobre actualizado',

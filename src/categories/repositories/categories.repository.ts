@@ -43,6 +43,22 @@ export class CategoriesRepository {
    * label, case-insensitive - used to reject duplicates before create, so
    * a user can't shadow a global category's name with a personal one.
    */
+  /**
+   * One category by id, but only if this user may use it - their own, or
+   * a global one. Envelopes reference categories by id now, so this is
+   * what stops a well-formed uuid belonging to someone else from being
+   * attached to an envelope.
+   */
+  async findVisibleForUserById(userId: string, id: string) {
+    return this.repository
+      .createQueryBuilder('category')
+      .where('category.id = :id', { id })
+      .andWhere('(category.userId = :userId OR category.userId IS NULL)', {
+        userId,
+      })
+      .getOne();
+  }
+
   async findVisibleForUserByLabel(userId: string, label: string) {
     return this.repository
       .createQueryBuilder('category')

@@ -36,21 +36,29 @@ export class EnvelopesRepository {
     const query = this.repository
       .createQueryBuilder('envelope')
       .where('envelope.userId = :userId', { userId })
+      // The category travels with the envelope now that it's a relation -
+      // responses embed it (label/colour/icon) so clients don't resolve
+      // it themselves. A left join: an envelope without one is normal.
+      .leftJoin('envelope.category', 'category')
       .select([
         'envelope.id',
         'envelope.name',
         'envelope.amount',
         'envelope.currency',
         'envelope.spent',
-        'envelope.category',
         'envelope.description',
         'envelope.createdAt',
         'envelope.updatedAt',
+        'category.id',
+        'category.label',
+        'category.color',
+        'category.icon',
       ]);
 
     if (filters.search) {
       query.andWhere(
-        '(LOWER(envelope.name) LIKE LOWER(:search) OR LOWER(envelope.category) LIKE LOWER(:search))',
+        // `category` is a joined table now, not a column on envelope.
+        '(LOWER(envelope.name) LIKE LOWER(:search) OR LOWER(category.label) LIKE LOWER(:search))',
         { search: `%${filters.search}%` },
       );
     }
@@ -76,7 +84,10 @@ export class EnvelopesRepository {
    * Find one envelope by ID
    */
   async findById(id: string) {
-    return this.repository.findOneBy({ id });
+    return this.repository.findOne({
+      where: { id },
+      relations: { category: true },
+    });
   }
 
   /**
@@ -85,7 +96,7 @@ export class EnvelopesRepository {
   async findByIdWithExpenses(id: string) {
     return this.repository.findOne({
       where: { id },
-      relations: { expenses: true },
+      relations: { expenses: true, category: true },
     });
   }
 

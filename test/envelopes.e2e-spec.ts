@@ -62,15 +62,51 @@ describe('Envelopes (e2e)', () => {
     await dataSource.query('DELETE FROM envelope');
   });
 
+  /**
+   * Creates a category and returns its id. Envelopes reference categories
+   * by id now, so a test that wants a classified envelope has to make the
+   * category first - which is also what the app does.
+   */
+  async function createCategory(label: string): Promise<string> {
+    // Reuse an existing visible category when there is one. Several of
+    // these labels ("Hogar", "Transporte") are among the nine global
+    // categories every user already sees, and a guard rejects creating a
+    // personal category that shadows a global label - so blindly POSTing
+    // returns 409.
+    const existing = await request(app.getHttpServer())
+      .get('/categories')
+      .expect(200);
+    const found = (existing.body as { id: string; label: string }[]).find(
+      (c) => c.label.toLowerCase() === label.toLowerCase(),
+    );
+    if (found) return found.id;
+
+    await request(app.getHttpServer())
+      .post('/categories')
+      .send({ label, color: 'oklch(0.72 0.14 153)', icon: 'tag' })
+      .expect(201);
+
+    const res = await request(app.getHttpServer())
+      .get('/categories')
+      .expect(200);
+    const category = (res.body as { id: string; label: string }[]).find(
+      (c) => c.label === label,
+    );
+    if (!category) throw new Error(`category ${label} not created`);
+    return category.id;
+  }
+
   describe('/envelopes (POST)', () => {
-    it('should create a new envelope', () => {
+    it('should create a new envelope', async () => {
+      const categoryId = await createCategory('Food');
+
       return request(app.getHttpServer())
         .post('/envelopes')
         .send({
           name: 'Groceries',
           amount: 500,
           currency: 'COP',
-          category: 'Food',
+          categoryId,
           description: 'Monthly groceries',
         })
         .expect(201)
@@ -141,11 +177,12 @@ describe('Envelopes (e2e)', () => {
 
     it('should return user envelopes without expenses', async () => {
       // Create an envelope first
+      const categoryId = await createCategory('Food');
       await request(app.getHttpServer()).post('/envelopes').send({
         name: 'Groceries',
         amount: 500,
         currency: 'COP',
-        category: 'Food',
+        categoryId,
       });
 
       return request(app.getHttpServer())
@@ -198,15 +235,17 @@ describe('Envelopes (e2e)', () => {
     });
 
     it('should filter by search across name and category, case-insensitively', async () => {
+      const foodId = await createCategory('Food');
+      const housingId = await createCategory('Housing');
       await request(app.getHttpServer()).post('/envelopes').send({
         name: 'Groceries',
         currency: 'COP',
-        category: 'Food',
+        categoryId: foodId,
       });
       await request(app.getHttpServer()).post('/envelopes').send({
         name: 'Rent',
         currency: 'COP',
-        category: 'Housing',
+        categoryId: housingId,
       });
 
       // Matches by name
@@ -243,11 +282,12 @@ describe('Envelopes (e2e)', () => {
   describe('/envelopes/:envelopeId (GET)', () => {
     it('should return envelope with expenses', async () => {
       // Create envelope via API
+      const categoryId = await createCategory('Food');
       const res = await request(app.getHttpServer()).post('/envelopes').send({
         name: 'Groceries',
         amount: 500,
         currency: 'COP',
-        category: 'Food',
+        categoryId,
       });
       const envelopeId =
         res.body.id ||
@@ -489,6 +529,78 @@ describe('Envelopes (e2e)', () => {
 
       const body = res.body as { data: { name: string }[] };
       expect(body.data.map((e) => e.name)).toEqual(['exceeded']);
+    });
+  });
+
+  /**
+   * The bug the foreign key exists to fix. As free text, renaming a
+   * category left every envelope holding the old string: it stopped
+   * resolving to any category, lost its icon and colour, and the renamed
+   * category's own envelope count dropped to zero - silently, with no
+   * error anywhere. Deleting behaved the same way.
+   */
+  describe('category lifecycle', () => {
+    it('keeps envelopes attached when their category is renamed', async () => {
+      const categoryId = await createCategory('Suscripciones QA');
+      await request(app.getHttpServer())
+        .post('/envelopes')
+        .send({ name: 'Streaming', currency: 'COP', categoryId })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/categories/${categoryId}`)
+        .send({ label: 'Suscripciones renombrada' })
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get('/envelopes')
+        .expect(200);
+      const [envelope] = (
+        res.body as {
+          data: { category: { id: string; label: string } | null }[];
+        }
+      ).data;
+
+      expect(envelope.category).not.toBeNull();
+      expect(envelope.category?.id).toBe(categoryId);
+      // The new name, not the one it was created with.
+      expect(envelope.category?.label).toBe('Suscripciones renombrada');
+    });
+
+    it('unclassifies envelopes when their category is deleted', async () => {
+      const categoryId = await createCategory('Suscripciones QA');
+      await request(app.getHttpServer())
+        .post('/envelopes')
+        .send({ name: 'Streaming', currency: 'COP', categoryId })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .delete(`/categories/${categoryId}`)
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get('/envelopes')
+        .expect(200);
+      const [envelope] = (
+        res.body as { data: { name: string; category: unknown }[] }
+      ).data;
+
+      // ON DELETE SET NULL - the envelope survives, it just stops being
+      // classified, rather than pointing at a category that is gone.
+      expect(envelope.name).toBe('Streaming');
+      expect(envelope.category).toBeNull();
+    });
+
+    it('rejects a category id belonging to someone else', async () => {
+      // Shape-valid uuid, but not a category this user can see.
+      await request(app.getHttpServer())
+        .post('/envelopes')
+        .send({
+          name: 'Ajeno',
+          currency: 'COP',
+          categoryId: '00000000-0000-4000-8000-000000000000',
+        })
+        .expect(404);
     });
   });
 });
