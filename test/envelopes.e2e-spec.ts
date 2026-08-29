@@ -603,4 +603,82 @@ describe('Envelopes (e2e)', () => {
         .expect(404);
     });
   });
+
+  /**
+   * GET /categories/usage - envelope counts per category, replacing the
+   * client fetching every envelope (capped at 100) and counting in
+   * memory, which under-reported for a large account.
+   */
+  describe('/categories/usage (GET)', () => {
+    it('counts envelopes per category, across currencies', async () => {
+      const hogar = await createCategory('Hogar');
+      const viajes = await createCategory('Viajes');
+
+      await request(app.getHttpServer())
+        .post('/envelopes')
+        .send({ name: 'a', currency: 'COP', categoryId: hogar })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post('/envelopes')
+        .send({ name: 'b', currency: 'USD', categoryId: hogar })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post('/envelopes')
+        .send({ name: 'c', currency: 'COP', categoryId: viajes })
+        .expect(201);
+
+      const res = await request(app.getHttpServer())
+        .get('/categories/usage')
+        .expect(200);
+
+      const byId = new Map(
+        (res.body as { categoryId: string; envelopeCount: number }[]).map(
+          (r) => [r.categoryId, r.envelopeCount],
+        ),
+      );
+      // Both currencies counted - unlike the dashboard breakdown, which
+      // is scoped to one.
+      expect(byId.get(hogar)).toBe(2);
+      expect(byId.get(viajes)).toBe(1);
+    });
+
+    it('counts envelopes with nothing spent', async () => {
+      // Also unlike the dashboard breakdown: this answers "how is it
+      // classified", not "where did the money go".
+      const hogar = await createCategory('Hogar');
+      await request(app.getHttpServer())
+        .post('/envelopes')
+        .send({ name: 'intacto', currency: 'COP', categoryId: hogar })
+        .expect(201);
+
+      const res = await request(app.getHttpServer())
+        .get('/categories/usage')
+        .expect(200);
+
+      expect(res.body).toEqual([{ categoryId: hogar, envelopeCount: 1 }]);
+    });
+
+    it('omits categories nothing uses rather than reporting zero', async () => {
+      await createCategory('Viajes');
+
+      const res = await request(app.getHttpServer())
+        .get('/categories/usage')
+        .expect(200);
+
+      expect(res.body).toEqual([]);
+    });
+
+    it('ignores envelopes with no category', async () => {
+      await request(app.getHttpServer())
+        .post('/envelopes')
+        .send({ name: 'sin', currency: 'COP' })
+        .expect(201);
+
+      const res = await request(app.getHttpServer())
+        .get('/categories/usage')
+        .expect(200);
+
+      expect(res.body).toEqual([]);
+    });
+  });
 });

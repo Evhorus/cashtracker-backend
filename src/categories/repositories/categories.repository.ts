@@ -49,6 +49,38 @@ export class CategoriesRepository {
    * what stops a well-formed uuid belonging to someone else from being
    * attached to an envelope.
    */
+  /**
+   * How many envelopes this user has in each category. One row per
+   * category they actually use - categories with none are simply absent,
+   * and the caller treats a missing entry as zero.
+   *
+   * Counts across every currency and regardless of spend, which is why
+   * this is not the dashboard's category breakdown: that one is scoped
+   * to a currency and skips envelopes with nothing spent, because it
+   * answers "where did the money go" rather than "how is this classified".
+   *
+   * Its own endpoint rather than a field on GET /categories: the
+   * dashboard layout fetches that list on every page to populate the
+   * category picker, and it has no use for counts - making it join and
+   * group every time would be a cost paid app-wide for one page.
+   */
+  async countEnvelopesByCategory(userId: string) {
+    const rows = await this.repository.manager
+      .createQueryBuilder()
+      .select('envelope.categoryId', 'categoryId')
+      .addSelect('COUNT(*)', 'envelopeCount')
+      .from('envelope', 'envelope')
+      .where('envelope.userId = :userId', { userId })
+      .andWhere('envelope.categoryId IS NOT NULL')
+      .groupBy('envelope.categoryId')
+      .getRawMany<{ categoryId: string; envelopeCount: string }>();
+
+    return rows.map((row) => ({
+      categoryId: row.categoryId,
+      envelopeCount: Number(row.envelopeCount),
+    }));
+  }
+
   async findVisibleForUserById(userId: string, id: string) {
     return this.repository
       .createQueryBuilder('category')
