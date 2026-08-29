@@ -1,11 +1,35 @@
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from 'dotenv';
 
-config();
+// Same file selection as app-config.module.ts. This used to be a bare
+// `config()`, which always read `.env` - and that was not a cosmetic
+// inconsistency, it silently defeated the whole test-environment split:
+//
+// DatabaseModule does TypeOrmModule.forRoot(dataSourceOptions), so this
+// module is evaluated when the module graph is *imported*, long before
+// Nest initializes the ConfigModule that honours `.env.test`. dotenv
+// never overwrites an already-set variable, so whatever landed in
+// process.env here won permanently. The result: `pnpm test:e2e` built
+// its connection from `.env` and connected to the development (in this
+// project, production) database, while ConfigModule's `.env.test`
+// affected only which values got *validated*. The e2e suites then ran
+// their own `DELETE FROM envelope` / `DELETE FROM expense` against it.
+const envFilePath = process.env.NODE_ENV === 'test' ? '.env.test' : '.env';
+config({ path: envFilePath });
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-const dbUrl = new URL(process.env.DATABASE_URL as string);
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    `DATABASE_URL is not set (loaded ${envFilePath}). ` +
+      (process.env.NODE_ENV === 'test'
+        ? 'Create a .env.test pointing at a DEDICATED test database - the e2e ' +
+          'suites delete rows between tests. It is gitignored.'
+        : 'Copy .env.template to .env and fill it in.'),
+  );
+}
+
+const dbUrl = new URL(process.env.DATABASE_URL);
 
 // Only fill in a default sslmode when the connection string doesn't already
 // specify one - never clobber an explicit choice. Production defaults to
@@ -47,6 +71,12 @@ export const dataSourceOptions: DataSourceOptions = {
   // MIGRATIONS_RUN_ON_BOOT=false and run `pnpm migration run` as a separate
   // release step once this scales past one replica, so concurrently
   // booting containers don't race to apply the same migration.
+  //
+  // Note this also applies under NODE_ENV=test, which is what gets the
+  // e2e database its schema - intended, and safe now that the env file
+  // above actually decides which database that is. Before that fix,
+  // booting the e2e suite applied pending migrations to whatever `.env`
+  // pointed at.
   migrationsRun: process.env.MIGRATIONS_RUN_ON_BOOT !== 'false',
   subscribers: [],
   poolSize: 10,
