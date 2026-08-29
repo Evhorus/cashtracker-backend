@@ -7,6 +7,7 @@ import { EnvelopesRepository } from '../envelopes/repositories/envelopes.reposit
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
 import { Envelope } from '../envelopes/entities/envelope.entity';
 import { Expense } from './entities/expense.entity';
+import { Currency } from 'src/common/enums/currency.enum';
 
 describe('ExpensesService', () => {
   let service: ExpensesService;
@@ -82,10 +83,13 @@ describe('ExpensesService', () => {
 
   describe('create', () => {
     it('should create an expense and increment envelope spent', async () => {
+      // Currency, not the string 'COP': CreateExpenseDto types it as
+      // the enum, so an untyped literal made this call not typecheck -
+      // the one error keeping `tsc --noEmit` from passing on this repo.
       const createDto = {
         name: 'Milk',
         amount: 10,
-        currency: 'COP',
+        currency: Currency.COP,
         date: new Date(),
       };
       expensesRepository.create.mockResolvedValue(mockExpense);
