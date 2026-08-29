@@ -115,4 +115,3 @@ export class DashboardService {
     return this.dashboardRepository.getRecentExpenses(userId, limit);
   }
 }
-
