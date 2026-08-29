@@ -122,12 +122,15 @@ describe('EnvelopesService', () => {
       });
       expect(result.data).toHaveLength(1);
       expect(result.data[0]).toHaveProperty('id');
+      // The derived status travels with every envelope, so no client has
+      // to recompute it - see utils/envelope-status.ts.
+      expect(result.data[0]).toHaveProperty('status');
       expect(result.data[0]).not.toHaveProperty('userId'); // DTO doesn't expose userId
       expect(repository.findByUserIdLight).toHaveBeenCalledWith(
         userId,
         1,
         20,
-        undefined,
+        {},
       );
     });
 
@@ -136,14 +139,14 @@ describe('EnvelopesService', () => {
       repository.findByUserIdLight.mockResolvedValue([[mockEnvelope], 1]);
 
       // Act
-      await service.findAllLight('user-123', 1, 20, 'grocer');
+      await service.findAllLight('user-123', 1, 20, { search: 'grocer' });
 
       // Assert
       expect(repository.findByUserIdLight).toHaveBeenCalledWith(
         'user-123',
         1,
         20,
-        'grocer',
+        { search: 'grocer' },
       );
     });
 

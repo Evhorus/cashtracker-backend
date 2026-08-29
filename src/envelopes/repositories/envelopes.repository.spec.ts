@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EnvelopesRepository } from './envelopes.repository';
 import { Envelope } from '../entities/envelope.entity';
+import { ENVELOPE_WARNING_THRESHOLD } from '../utils/envelope-status';
 
 describe('EnvelopesRepository', () => {
   let repository: EnvelopesRepository;
@@ -121,13 +122,80 @@ describe('EnvelopesRepository', () => {
       mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockEnvelope], 1]);
 
       // Act
-      await repository.findByUserIdLight('user-123', 1, 20, 'grocer');
+      await repository.findByUserIdLight('user-123', 1, 20, {
+        search: 'grocer',
+      });
 
       // Assert
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         '(LOWER(envelope.name) LIKE LOWER(:search) OR LOWER(envelope.category) LIKE LOWER(:search))',
         { search: '%grocer%' },
       );
+    });
+
+    it('should filter by derived status in SQL, not in memory', async () => {
+      // Arrange
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockEnvelope], 1]);
+
+      // Act
+      await repository.findByUserIdLight('user-123', 1, 20, {
+        status: 'alert',
+      });
+
+      // Assert - the threshold arrives as a parameter, never inlined, so
+      // it cannot drift from ENVELOPE_WARNING_THRESHOLD.
+      const calls = mockQueryBuilder.andWhere.mock.calls as [
+        string,
+        Record<string, unknown>?,
+      ][];
+      const alertCall = calls.find(([clause]) =>
+        clause.includes('warningThreshold'),
+      );
+      expect(alertCall).toBeDefined();
+      expect(alertCall?.[1]).toEqual({
+        warningThreshold: ENVELOPE_WARNING_THRESHOLD,
+      });
+    });
+
+    it('should filter unlimited envelopes on amount IS NULL', async () => {
+      // Arrange
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockEnvelope], 1]);
+
+      // Act
+      await repository.findByUserIdLight('user-123', 1, 20, {
+        status: 'unlimited',
+      });
+
+      // Assert
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        '(envelope.amount IS NULL)',
+        {},
+      );
+    });
+
+    it('should combine search and status rather than replacing one', async () => {
+      // Arrange
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockEnvelope], 1]);
+
+      // Act
+      await repository.findByUserIdLight('user-123', 1, 20, {
+        search: 'grocer',
+        status: 'exceeded',
+      });
+
+      // Assert
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledTimes(2);
+    });
+
+    it('should add no status clause for "all"', async () => {
+      // Arrange
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([[mockEnvelope], 1]);
+
+      // Act
+      await repository.findByUserIdLight('user-123', 1, 20, { status: 'all' });
+
+      // Assert
+      expect(mockQueryBuilder.andWhere).not.toHaveBeenCalled();
     });
 
     it('should not filter when search is omitted', async () => {
