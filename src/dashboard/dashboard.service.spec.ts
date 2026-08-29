@@ -195,8 +195,12 @@ describe('DashboardService', () => {
         12,
         'USD',
       );
+      // The raw month key, passed through untouched - this used to
+      // assert 'Ago', a Spanish month name the service formatted
+      // itself, which is exactly what made the response
+      // Spanish-only.
       expect(result.chart).toEqual([
-        { label: 'Ago', spent: 200, available: 800 },
+        { month: '2026-08', spent: 200, available: 800 },
       ]);
     });
 

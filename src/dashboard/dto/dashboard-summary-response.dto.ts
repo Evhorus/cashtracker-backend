@@ -1,12 +1,13 @@
 /**
  * One bar's worth of chart data: total spent vs. still available
- * (summed across capped envelopes only) for one calendar month, e.g.
- * `label: "Ago 2026"`. Chronologically ascending. Scoped to one
- * currency at a time - see `chartCurrency` on
- * DashboardSummaryResponseDto for which one.
+ * (summed across capped envelopes only) for one calendar month.
+ * Chronologically ascending. Scoped to one currency at a time - see
+ * `chartCurrency` on DashboardSummaryResponseDto for which one.
  */
 export class DashboardChartEntryDto {
-  label: string;
+  /** "YYYY-MM", e.g. "2026-08". Deliberately not a formatted month
+   * name: the client owns how (and in which language) it reads. */
+  month: string;
   spent: number;
   available: number;
 }
