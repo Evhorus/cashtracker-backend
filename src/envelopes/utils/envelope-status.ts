@@ -36,16 +36,28 @@ export type EnvelopeProgressStatus =
   (typeof ENVELOPE_PROGRESS_STATUSES)[number];
 
 /**
- * The coarser groupings the list endpoint can filter by. Deliberately
- * not the same set as the statuses above:
- * - `active` merges `normal` and `warning` ("a limited envelope that
- *   isn't over yet").
- * - `alert` merges `warning` and `exceeded` ("needs your attention"), so
- *   it overlaps `active` and `exceeded` rather than partitioning the
- *   list the way the others do.
+ * What the list endpoint can filter by: "all", any single status, or
+ * `alert` - which merges `warning` and `exceeded` ("needs your
+ * attention") and so overlaps them rather than partitioning the list the
+ * way the others do.
  */
 export const ENVELOPE_STATUS_FILTERS = [
   'all',
+  // One filter per status, so a client's tab labels can be the status
+  // words themselves rather than a second vocabulary. Added because the
+  // web app's tabs read "Activos"/"En alerta" while the same envelopes'
+  // badges read "Controlado"/"En riesgo" - two vocabularies for one set
+  // of states, on one screen.
+  'normal',
+  'warning',
+  // Unions rather than states. `alert` (warning + exceeded, "needs your
+  // attention") is what the summary page fetches for its alert widget
+  // and count. `active` (normal + warning) is on its way out - it has no
+  // consumer once the web app's tabs become the statuses themselves, and
+  // no word named it honestly, since an envelope is never activated or
+  // deactivated. Kept for this release only so the already-deployed
+  // frontend, which still sends it, keeps working: the backend expands
+  // first, the client switches, then this contracts.
   'active',
   'alert',
   'exceeded',
@@ -131,6 +143,29 @@ export function buildEnvelopeStatusPredicate(
         params: {},
       };
 
+    // Mirrors deriveEnvelopeStatus's `ratio < threshold` branch, plus
+    // its non-positive-limit case (no meaningful ratio, so "normal"
+    // until anything is spent).
+    case 'normal':
+      return {
+        clause:
+          `${amount} IS NOT NULL AND (` +
+          `(${amount} > 0 AND ${spent} < ${amount} * :warningThreshold) OR ` +
+          `(${amount} <= 0 AND ${spent} <= 0))`,
+        params,
+      };
+
+    // At or past the threshold but not over the limit. A non-positive
+    // limit can never be "warning" - it goes straight from normal to
+    // exceeded - which is why there is no second branch here.
+    case 'warning':
+      return {
+        clause:
+          `${amount} > 0 AND ${spent} >= ${amount} * :warningThreshold ` +
+          `AND ${spent} <= ${amount}`,
+        params,
+      };
+
     // normal + warning
     case 'active':
       return {
@@ -165,6 +200,10 @@ export function statusMatchesFilter(
       return status === 'unlimited';
     case 'exceeded':
       return status === 'exceeded';
+    case 'normal':
+      return status === 'normal';
+    case 'warning':
+      return status === 'warning';
     case 'active':
       return status === 'normal' || status === 'warning';
     case 'alert':

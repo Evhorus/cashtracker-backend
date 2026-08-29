@@ -54,7 +54,15 @@ describe('deriveEnvelopeStatus', () => {
 });
 
 describe('statusMatchesFilter', () => {
-  it('groups the statuses the way the UI tabs expect', () => {
+  it('matches a single-status filter to exactly that status', () => {
+    for (const status of ENVELOPE_PROGRESS_STATUSES) {
+      for (const other of ENVELOPE_PROGRESS_STATUSES) {
+        expect(statusMatchesFilter(status, other)).toBe(status === other);
+      }
+    }
+  });
+
+  it('groups the unions the way their consumers expect', () => {
     expect(statusMatchesFilter('normal', 'active')).toBe(true);
     expect(statusMatchesFilter('warning', 'active')).toBe(true);
     expect(statusMatchesFilter('exceeded', 'active')).toBe(false);
@@ -62,9 +70,7 @@ describe('statusMatchesFilter', () => {
     expect(statusMatchesFilter('warning', 'alert')).toBe(true);
     expect(statusMatchesFilter('exceeded', 'alert')).toBe(true);
     expect(statusMatchesFilter('normal', 'alert')).toBe(false);
-
-    expect(statusMatchesFilter('unlimited', 'unlimited')).toBe(true);
-    expect(statusMatchesFilter('unlimited', 'active')).toBe(false);
+    expect(statusMatchesFilter('unlimited', 'alert')).toBe(false);
   });
 
   it('accepts everything under "all"', () => {
@@ -104,6 +110,15 @@ describe('SQL predicate agrees with the TypeScript derivation', () => {
     active: (amount, spent) =>
       amount !== null &&
       ((amount > 0 && spent <= amount) || (amount <= 0 && spent <= 0)),
+    normal: (amount, spent) =>
+      amount !== null &&
+      ((amount > 0 && spent < amount * THRESHOLD) ||
+        (amount <= 0 && spent <= 0)),
+    warning: (amount, spent) =>
+      amount !== null &&
+      amount > 0 &&
+      spent >= amount * THRESHOLD &&
+      spent <= amount,
     alert: (amount, spent) =>
       amount !== null &&
       ((amount > 0 && spent >= amount * THRESHOLD) ||
