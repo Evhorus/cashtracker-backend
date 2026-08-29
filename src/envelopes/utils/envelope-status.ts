@@ -50,15 +50,12 @@ export const ENVELOPE_STATUS_FILTERS = [
   // of states, on one screen.
   'normal',
   'warning',
-  // Unions rather than states. `alert` (warning + exceeded, "needs your
-  // attention") is what the summary page fetches for its alert widget
-  // and count. `active` (normal + warning) is on its way out - it has no
-  // consumer once the web app's tabs become the statuses themselves, and
-  // no word named it honestly, since an envelope is never activated or
-  // deactivated. Kept for this release only so the already-deployed
-  // frontend, which still sends it, keeps working: the backend expands
-  // first, the client switches, then this contracts.
-  'active',
+  // The one union that survives: warning + exceeded, "needs your
+  // attention". Not something a user picks from a tab - the summary
+  // page fetches it for its alert widget and count, which is why it
+  // stays a filter while `active` (normal + warning) was removed. That
+  // one had no consumer, and no word named it honestly: an envelope is
+  // never activated or deactivated.
   'alert',
   'exceeded',
   'unlimited',
@@ -166,16 +163,6 @@ export function buildEnvelopeStatusPredicate(
         params,
       };
 
-    // normal + warning
-    case 'active':
-      return {
-        clause:
-          `${amount} IS NOT NULL AND (` +
-          `(${amount} > 0 AND ${spent} <= ${amount}) OR ` +
-          `(${amount} <= 0 AND ${spent} <= 0))`,
-        params: {},
-      };
-
     // warning + exceeded
     case 'alert':
       return {
@@ -204,8 +191,6 @@ export function statusMatchesFilter(
       return status === 'normal';
     case 'warning':
       return status === 'warning';
-    case 'active':
-      return status === 'normal' || status === 'warning';
     case 'alert':
       return status === 'warning' || status === 'exceeded';
   }
