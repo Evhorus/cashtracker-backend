@@ -1,61 +1,93 @@
-import { assertSafeTestDatabase } from './assert-safe-test-database';
+import { checkTestDatabase } from './assert-safe-test-database';
 
 /**
  * A safety guard nobody tests is a safety guard nobody knows still
- * works. The scenario that matters is the first test below: someone
- * creates .env.test and pastes the production connection string into it.
+ * works. The scenario that matters is the first test: someone points
+ * .env.test at the same database the app uses every day.
+ *
+ * Tests the pure decision function, so there is no filesystem to mock -
+ * assertSafeTestDatabase() is only the `readFileSync` + `throw` wrapper
+ * around it.
  */
-describe('assertSafeTestDatabase', () => {
-  const originalUrl = process.env.DATABASE_URL;
+describe('checkTestDatabase', () => {
+  const EVERYDAY =
+    'postgresql://u:p@ep-young-meadow.aws.neon.tech/neondb?sslmode=require';
 
-  afterEach(() => {
-    if (originalUrl === undefined) {
-      delete process.env.DATABASE_URL;
-    } else {
-      process.env.DATABASE_URL = originalUrl;
-    }
+  it('refuses when the target is the everyday database', () => {
+    const result = checkTestDatabase(EVERYDAY, EVERYDAY);
+
+    expect(result.ok).toBe(false);
+    expect(result).toHaveProperty(
+      'error',
+      expect.stringContaining('same database as .env'),
+    );
   });
 
-  it('refuses a production-looking database name', () => {
-    // This project's real database is literally called "neondb".
-    process.env.DATABASE_URL =
-      'postgresql://u:p@ep-proud-recipe.aws.neon.tech/neondb?sslmode=require';
+  it('refuses even when the URLs differ only cosmetically', () => {
+    // Uppercase host, different credentials, different query params -
+    // still the same database.
+    const result = checkTestDatabase(
+      'postgresql://other:creds@EP-YOUNG-MEADOW.AWS.NEON.TECH/NeonDB?channel_binding=require',
+      EVERYDAY,
+    );
 
-    expect(() => assertSafeTestDatabase()).toThrow(/refusing to wipe tables/);
-    expect(() => assertSafeTestDatabase()).toThrow(/neondb/);
+    expect(result.ok).toBe(false);
+  });
+
+  it('accepts a different host even when the database name is identical', () => {
+    // Exactly this project's setup: two Neon branches, both called
+    // "neondb". A name-based rule would have rejected this.
+    const result = checkTestDatabase(
+      'postgresql://u:p@ep-proud-recipe.aws.neon.tech/neondb?sslmode=require',
+      EVERYDAY,
+    );
+
+    expect(result).toEqual({ ok: true });
+  });
+
+  it('accepts a different database name on the same host', () => {
+    const result = checkTestDatabase(
+      'postgresql://u:p@ep-young-meadow.aws.neon.tech/neondb_test',
+      EVERYDAY,
+    );
+
+    expect(result).toEqual({ ok: true });
+  });
+
+  it('distinguishes databases that differ only by port', () => {
+    const result = checkTestDatabase(
+      'postgresql://u:p@localhost:5433/app',
+      'postgresql://u:p@localhost:5432/app',
+    );
+
+    expect(result).toEqual({ ok: true });
   });
 
   it('refuses when DATABASE_URL is missing entirely', () => {
-    delete process.env.DATABASE_URL;
+    const result = checkTestDatabase(undefined, EVERYDAY);
 
-    expect(() => assertSafeTestDatabase()).toThrow(/DATABASE_URL is not set/);
+    expect(result).toHaveProperty(
+      'error',
+      expect.stringContaining('DATABASE_URL is not set'),
+    );
   });
 
   it('refuses an unparseable DATABASE_URL rather than assuming it is fine', () => {
-    process.env.DATABASE_URL = 'not-a-url';
+    const result = checkTestDatabase('not-a-url', EVERYDAY);
 
-    expect(() => assertSafeTestDatabase()).toThrow(/could not be parsed/);
+    expect(result).toHaveProperty(
+      'error',
+      expect.stringContaining('could not be parsed'),
+    );
   });
 
-  it.each([
-    'postgresql://u:p@host/neondb_test',
-    'postgresql://u:p@host/cashtracker_test',
-    'postgresql://u:p@host/cashtracker-test',
-    'postgresql://u:p@host/test',
-    'postgresql://u:p@host/test_db?sslmode=require',
-  ])('accepts a test database name (%s)', (url) => {
-    process.env.DATABASE_URL = url;
+  it('warns instead of passing silently when there is nothing to compare against', () => {
+    const result = checkTestDatabase('postgresql://u:p@ci-host/anything', null);
 
-    expect(() => assertSafeTestDatabase()).not.toThrow();
-  });
-
-  it.each([
-    'postgresql://u:p@host/production',
-    'postgresql://u:p@host/cashtracker',
-    'postgresql://u:p@host/main',
-  ])('refuses anything else (%s)', (url) => {
-    process.env.DATABASE_URL = url;
-
-    expect(() => assertSafeTestDatabase()).toThrow(/refusing to wipe tables/);
+    expect(result.ok).toBe(true);
+    expect(result).toHaveProperty(
+      'warning',
+      expect.stringContaining('could not be compared'),
+    );
   });
 });
