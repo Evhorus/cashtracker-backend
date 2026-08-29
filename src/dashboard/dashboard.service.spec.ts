@@ -12,6 +12,7 @@ describe('DashboardService', () => {
       getMonthlySpending: jest.fn(),
       getAvailableYears: jest.fn(),
       getRecentExpenses: jest.fn(),
+      getCategoryBreakdown: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -210,6 +211,47 @@ describe('DashboardService', () => {
       // Assert
       expect(repository.getMonthlySpending).not.toHaveBeenCalled();
       expect(result.chart).toEqual([]);
+    });
+  });
+
+  describe('getCategoryBreakdown', () => {
+    it('passes currency and year straight through', async () => {
+      repository.getCategoryBreakdown.mockResolvedValue([]);
+
+      await service.getCategoryBreakdown('user-123', 'COP', 2026);
+
+      expect(repository.getCategoryBreakdown).toHaveBeenCalledWith(
+        'user-123',
+        'COP',
+        2026,
+      );
+    });
+
+    it('leaves year undefined for an all-time breakdown', async () => {
+      repository.getCategoryBreakdown.mockResolvedValue([]);
+
+      await service.getCategoryBreakdown('user-123', 'USD');
+
+      expect(repository.getCategoryBreakdown).toHaveBeenCalledWith(
+        'user-123',
+        'USD',
+        undefined,
+      );
+    });
+
+    it('returns the aggregated rows unchanged', async () => {
+      // The service is a pass-through here on purpose - the grouping is
+      // the database's job, and reshaping rows in between would be a
+      // second place for the numbers to change.
+      const rows = [
+        { category: 'Hogar', spent: 1_525_500, envelopeCount: 4 },
+        { category: null, spent: 12_012, envelopeCount: 1 },
+      ];
+      repository.getCategoryBreakdown.mockResolvedValue(rows);
+
+      await expect(
+        service.getCategoryBreakdown('user-123', 'COP'),
+      ).resolves.toEqual(rows);
     });
   });
 
