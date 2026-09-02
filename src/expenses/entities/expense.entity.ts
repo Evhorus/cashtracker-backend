@@ -19,7 +19,7 @@ export class Expense {
   @Column()
   currency: string;
 
-  @Column({ type: 'decimal' })
+  @Column({ type: 'decimal', precision: 12, scale: 2 })
   amount: number;
 
   @Column({ type: 'date' })
