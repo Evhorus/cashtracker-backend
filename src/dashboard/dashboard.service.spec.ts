@@ -13,6 +13,9 @@ describe('DashboardService', () => {
       getAvailableYears: jest.fn(),
       getRecentExpenses: jest.fn(),
       getCategoryBreakdown: jest.fn(),
+      getEnvelopeBreakdown: jest.fn(),
+      getNameBreakdown: jest.fn(),
+      getBreakdownTotal: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -219,19 +222,34 @@ describe('DashboardService', () => {
   });
 
   describe('getCategoryBreakdown', () => {
-    it('passes currency and year straight through', async () => {
+    it('passes currency and filters straight through', async () => {
       repository.getCategoryBreakdown.mockResolvedValue([]);
 
-      await service.getCategoryBreakdown('user-123', 'COP', 2026);
+      await service.getCategoryBreakdown('user-123', 'COP', { year: 2026 });
 
       expect(repository.getCategoryBreakdown).toHaveBeenCalledWith(
         'user-123',
         'COP',
-        2026,
+        { year: 2026 },
       );
     });
 
-    it('leaves year undefined for an all-time breakdown', async () => {
+    it('passes an exact date range straight through', async () => {
+      repository.getCategoryBreakdown.mockResolvedValue([]);
+
+      await service.getCategoryBreakdown('user-123', 'COP', {
+        startDate: '2026-01-01',
+        endDate: '2026-08-31',
+      });
+
+      expect(repository.getCategoryBreakdown).toHaveBeenCalledWith(
+        'user-123',
+        'COP',
+        { startDate: '2026-01-01', endDate: '2026-08-31' },
+      );
+    });
+
+    it('defaults to an empty filter object for an all-time breakdown', async () => {
       repository.getCategoryBreakdown.mockResolvedValue([]);
 
       await service.getCategoryBreakdown('user-123', 'USD');
@@ -239,7 +257,7 @@ describe('DashboardService', () => {
       expect(repository.getCategoryBreakdown).toHaveBeenCalledWith(
         'user-123',
         'USD',
-        undefined,
+        {},
       );
     });
 
@@ -256,16 +274,102 @@ describe('DashboardService', () => {
             icon: 'house',
           },
           spent: 1_525_500,
-          envelopeCount: 4,
+          expenseCount: 4,
         },
-        // Envelopes with no category group into a single null row.
-        { category: null, spent: 12_012, envelopeCount: 1 },
+        // Expenses whose envelope has no category group into a single
+        // null row.
+        { category: null, spent: 12_012, expenseCount: 1 },
       ];
       repository.getCategoryBreakdown.mockResolvedValue(rows);
 
       await expect(
         service.getCategoryBreakdown('user-123', 'COP'),
       ).resolves.toEqual(rows);
+    });
+  });
+
+  describe('getEnvelopeBreakdown', () => {
+    it('passes currency and filters straight through', async () => {
+      repository.getEnvelopeBreakdown.mockResolvedValue([]);
+
+      await service.getEnvelopeBreakdown('user-123', 'COP', {
+        startDate: '2026-01-01',
+        endDate: '2026-08-31',
+      });
+
+      expect(repository.getEnvelopeBreakdown).toHaveBeenCalledWith(
+        'user-123',
+        'COP',
+        { startDate: '2026-01-01', endDate: '2026-08-31' },
+      );
+    });
+
+    it('returns the aggregated rows unchanged', async () => {
+      const rows = [
+        {
+          envelopeId: 'env-1',
+          envelopeName: 'Arriendos',
+          spent: 8_000_000,
+          expenseCount: 8,
+        },
+      ];
+      repository.getEnvelopeBreakdown.mockResolvedValue(rows);
+
+      await expect(
+        service.getEnvelopeBreakdown('user-123', 'COP'),
+      ).resolves.toEqual(rows);
+    });
+  });
+
+  describe('getNameBreakdown', () => {
+    it('passes currency and filters straight through', async () => {
+      repository.getNameBreakdown.mockResolvedValue([]);
+
+      await service.getNameBreakdown('user-123', 'COP', { year: 2026 });
+
+      expect(repository.getNameBreakdown).toHaveBeenCalledWith(
+        'user-123',
+        'COP',
+        { year: 2026 },
+      );
+    });
+
+    it('returns the aggregated rows unchanged', async () => {
+      const rows = [{ name: 'Arriendo', spent: 8_000_000, expenseCount: 8 }];
+      repository.getNameBreakdown.mockResolvedValue(rows);
+
+      await expect(
+        service.getNameBreakdown('user-123', 'COP'),
+      ).resolves.toEqual(rows);
+    });
+  });
+
+  describe('getBreakdownTotal', () => {
+    it('passes currency and filters straight through', async () => {
+      repository.getBreakdownTotal.mockResolvedValue({
+        spent: 0,
+        expenseCount: 0,
+      });
+
+      await service.getBreakdownTotal('user-123', 'COP', {
+        startDate: '2026-01-01',
+        endDate: '2026-08-31',
+      });
+
+      expect(repository.getBreakdownTotal).toHaveBeenCalledWith(
+        'user-123',
+        'COP',
+        { startDate: '2026-01-01', endDate: '2026-08-31' },
+      );
+    });
+
+    it('returns the aggregated total unchanged', async () => {
+      const total = { spent: 8_000_000, expenseCount: 8 };
+      repository.getBreakdownTotal.mockResolvedValue(total);
+
+      await expect(
+        service.getBreakdownTotal('user-123', 'COP'),
+      ).resolves.toEqual(total);
     });
   });
 
