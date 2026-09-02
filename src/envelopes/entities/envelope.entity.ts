@@ -23,10 +23,10 @@ export class Envelope {
   @Column()
   currency: string;
 
-  @Column({ type: 'decimal', nullable: true })
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   amount: number | null;
 
-  @Column({ type: 'decimal' })
+  @Column({ type: 'decimal', precision: 12, scale: 2 })
   spent: number;
 
   @Column()
