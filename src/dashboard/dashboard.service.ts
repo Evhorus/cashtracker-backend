@@ -2,7 +2,19 @@ import { Injectable } from '@nestjs/common';
 import { DashboardRepository } from './repositories/dashboard.repository';
 import { DashboardSummaryResponseDto } from './dto/dashboard-summary-response.dto';
 import { DashboardCategoryBreakdownDto } from './dto/dashboard-category-breakdown-response.dto';
+import { DashboardEnvelopeBreakdownDto } from './dto/dashboard-envelope-breakdown-response.dto';
+import { DashboardNameBreakdownDto } from './dto/dashboard-name-breakdown-response.dto';
+import { DashboardBreakdownTotalDto } from './dto/dashboard-breakdown-total-response.dto';
 import { DashboardRecentExpenseDto } from './dto/dashboard-recent-expense-response.dto';
+
+/** Shared by the four breakdown methods below - see
+ * DashboardRepository.withUserCurrencyAndDateRange for how they're
+ * applied. */
+interface BreakdownFilters {
+  year?: number;
+  startDate?: string;
+  endDate?: string;
+}
 
 const CHART_MONTHS_LIMIT = 12;
 
@@ -83,8 +95,10 @@ export class DashboardService {
   }
 
   /**
-   * Spending grouped by category for one currency - the
-   * spending-by-category widget on the statistics page.
+   * Spending grouped by category, for one currency and period - one tab
+   * of the statistics page's breakdown card. Scoped by each expense's
+   * own date (see DashboardRepository.withUserCurrencyAndDateRange),
+   * not by when its envelope was created.
    *
    * Its own endpoint rather than part of the summary: the summary page
    * never renders it, so folding it in would run an extra GROUP BY on every
@@ -93,12 +107,57 @@ export class DashboardService {
   async getCategoryBreakdown(
     userId: string,
     currency: string,
-    year?: number,
+    filters: BreakdownFilters = {},
   ): Promise<DashboardCategoryBreakdownDto[]> {
     return this.dashboardRepository.getCategoryBreakdown(
       userId,
       currency,
-      year,
+      filters,
+    );
+  }
+
+  /**
+   * Spending grouped by envelope, for one currency and period - the
+   * "por sobre" tab next to getCategoryBreakdown above.
+   */
+  async getEnvelopeBreakdown(
+    userId: string,
+    currency: string,
+    filters: BreakdownFilters = {},
+  ): Promise<DashboardEnvelopeBreakdownDto[]> {
+    return this.dashboardRepository.getEnvelopeBreakdown(
+      userId,
+      currency,
+      filters,
+    );
+  }
+
+  /**
+   * Spending grouped by the expense's own name, for one currency and
+   * period - surfaces recurring expenses (e.g. "Arriendo" paid every
+   * month) as a single total, the "por nombre" tab.
+   */
+  async getNameBreakdown(
+    userId: string,
+    currency: string,
+    filters: BreakdownFilters = {},
+  ): Promise<DashboardNameBreakdownDto[]> {
+    return this.dashboardRepository.getNameBreakdown(userId, currency, filters);
+  }
+
+  /**
+   * The grand total across every expense in the period/currency - the
+   * "Total" tab, a single number rather than a list of rows.
+   */
+  async getBreakdownTotal(
+    userId: string,
+    currency: string,
+    filters: BreakdownFilters = {},
+  ): Promise<DashboardBreakdownTotalDto> {
+    return this.dashboardRepository.getBreakdownTotal(
+      userId,
+      currency,
+      filters,
     );
   }
 

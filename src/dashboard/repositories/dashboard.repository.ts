@@ -50,10 +50,58 @@ export class DashboardRepository {
   }
 
   /**
-   * Aggregate query grouped by category: sum of `spent` and envelope
-   * count, one row per category the user actually has envelopes in.
-   * Scoped to a single currency, for the same reason the chart is -
-   * summing money across currencies is meaningless.
+   * Shared base for the four "breakdown" queries (category, envelope,
+   * name, total) - all four group the same underlying set of expenses,
+   * just along a different axis, so they all start from one query.
+   *
+   * Filters by each expense's own `date`, not the envelope's
+   * `createdAt` the way withUserAndYear above does - an envelope in
+   * this app can carry expenses spanning several months (e.g. a rent
+   * envelope created in September with expenses dated back to
+   * February), so scoping a period-filtered breakdown to the envelope's
+   * creation date would silently exclude expenses that are genuinely
+   * inside the requested period, and include ones that aren't.
+   *
+   * An exact range (startDate/endDate) wins over `year` when somehow
+   * both are present - the frontend never sends both (see
+   * BreakdownQueryDto), but a range is the more specific instruction
+   * either way. All three omitted means all-time.
+   */
+  private withUserCurrencyAndDateRange(
+    userId: string,
+    currency: string,
+    filters: { year?: number; startDate?: string; endDate?: string },
+  ) {
+    const qb = this.expenseRepository
+      .createQueryBuilder('expense')
+      .innerJoin('expense.envelope', 'envelope')
+      .where('envelope.userId = :userId', { userId })
+      .andWhere('expense.currency = :currency', { currency });
+
+    if (filters.startDate || filters.endDate) {
+      if (filters.startDate) {
+        qb.andWhere('expense.date >= :startDate', {
+          startDate: filters.startDate,
+        });
+      }
+      if (filters.endDate) {
+        qb.andWhere('expense.date <= :endDate', { endDate: filters.endDate });
+      }
+    } else if (filters.year) {
+      qb.andWhere('EXTRACT(YEAR FROM expense.date) = :year', {
+        year: filters.year,
+      });
+    }
+
+    return qb;
+  }
+
+  /**
+   * Aggregate query grouped by category: sum of expense amounts and how
+   * many expenses contributed, one row per category the user actually
+   * has spending in during the requested period. Scoped to a single
+   * currency, for the same reason the chart is - summing money across
+   * currencies is meaningless.
    *
    * Exists so the breakdown doesn't have to fetch every envelope and
    * reduce over it client-side, which was capped at the list endpoint's
@@ -69,31 +117,35 @@ export class DashboardRepository {
    * render the chip without a second lookup, matching how envelope
    * responses embed their category.
    */
-  async getCategoryBreakdown(userId: string, currency: string, year?: number) {
-    const rows = await this.withUserAndYear(userId, year)
+  async getCategoryBreakdown(
+    userId: string,
+    currency: string,
+    filters: { year?: number; startDate?: string; endDate?: string } = {},
+  ) {
+    const rows = await this.withUserCurrencyAndDateRange(
+      userId,
+      currency,
+      filters,
+    )
       .leftJoin('envelope.category', 'category')
-      .andWhere('envelope.currency = :currency', { currency })
-      // Envelopes with nothing spent contribute nothing to a breakdown
-      // of spending, and would render as 0% rows.
-      .andWhere('envelope.spent > 0')
       .select('category.id', 'categoryId')
       .addSelect('category.label', 'label')
       .addSelect('category.color', 'color')
       .addSelect('category.icon', 'icon')
-      .addSelect('COALESCE(SUM(envelope.spent), 0)', 'spent')
-      .addSelect('COUNT(*)', 'envelopeCount')
+      .addSelect('COALESCE(SUM(expense.amount), 0)', 'spent')
+      .addSelect('COUNT(*)', 'expenseCount')
       .groupBy('category.id')
       .addGroupBy('category.label')
       .addGroupBy('category.color')
       .addGroupBy('category.icon')
-      .orderBy('SUM(envelope.spent)', 'DESC')
+      .orderBy('SUM(expense.amount)', 'DESC')
       .getRawMany<{
         categoryId: string | null;
         label: string | null;
         color: string | null;
         icon: string | null;
         spent: string;
-        envelopeCount: string;
+        expenseCount: string;
       }>();
 
     return rows.map((row) => ({
@@ -106,8 +158,108 @@ export class DashboardRepository {
           }
         : null,
       spent: Number(row.spent),
-      envelopeCount: Number(row.envelopeCount),
+      expenseCount: Number(row.expenseCount),
     }));
+  }
+
+  /**
+   * Aggregate query grouped by envelope: sum of expense amounts and how
+   * many expenses contributed, one row per envelope with spending in
+   * the requested period/currency. Same date-scoping as
+   * getCategoryBreakdown above.
+   */
+  async getEnvelopeBreakdown(
+    userId: string,
+    currency: string,
+    filters: { year?: number; startDate?: string; endDate?: string } = {},
+  ) {
+    const rows = await this.withUserCurrencyAndDateRange(
+      userId,
+      currency,
+      filters,
+    )
+      .select('envelope.id', 'envelopeId')
+      .addSelect('envelope.name', 'envelopeName')
+      .addSelect('COALESCE(SUM(expense.amount), 0)', 'spent')
+      .addSelect('COUNT(*)', 'expenseCount')
+      .groupBy('envelope.id')
+      .addGroupBy('envelope.name')
+      .orderBy('SUM(expense.amount)', 'DESC')
+      .getRawMany<{
+        envelopeId: string;
+        envelopeName: string;
+        spent: string;
+        expenseCount: string;
+      }>();
+
+    return rows.map((row) => ({
+      envelopeId: row.envelopeId,
+      envelopeName: row.envelopeName,
+      spent: Number(row.spent),
+      expenseCount: Number(row.expenseCount),
+    }));
+  }
+
+  /**
+   * Aggregate query grouped by the expense's own name: sum of amounts
+   * and how many expenses share it, one row per distinct name with
+   * spending in the requested period/currency - surfaces recurring
+   * expenses (e.g. "Arriendo" paid every month) as a single total.
+   * Names are already normalized on save (normalizeString), so grouping
+   * on the exact stored string needs no further merging here.
+   */
+  async getNameBreakdown(
+    userId: string,
+    currency: string,
+    filters: { year?: number; startDate?: string; endDate?: string } = {},
+  ) {
+    const rows = await this.withUserCurrencyAndDateRange(
+      userId,
+      currency,
+      filters,
+    )
+      .select('expense.name', 'name')
+      .addSelect('COALESCE(SUM(expense.amount), 0)', 'spent')
+      .addSelect('COUNT(*)', 'expenseCount')
+      .groupBy('expense.name')
+      .orderBy('SUM(expense.amount)', 'DESC')
+      .getRawMany<{ name: string; spent: string; expenseCount: string }>();
+
+    return rows.map((row) => ({
+      name: row.name,
+      spent: Number(row.spent),
+      expenseCount: Number(row.expenseCount),
+    }));
+  }
+
+  /**
+   * The grand total across every matching expense - the same set of
+   * rows the three breakdowns above each group differently, collapsed
+   * to one number. Its own query rather than summing one of the other
+   * three client-side, so the total is right even when every breakdown
+   * happens to be empty (e.g. every expense's envelope has no category,
+   * which would make getCategoryBreakdown return a single `null`-
+   * category row - correct, but an easy thing to get wrong summing over
+   * client-side).
+   */
+  async getBreakdownTotal(
+    userId: string,
+    currency: string,
+    filters: { year?: number; startDate?: string; endDate?: string } = {},
+  ) {
+    const row = await this.withUserCurrencyAndDateRange(
+      userId,
+      currency,
+      filters,
+    )
+      .select('COALESCE(SUM(expense.amount), 0)', 'spent')
+      .addSelect('COUNT(*)', 'expenseCount')
+      .getRawOne<{ spent: string; expenseCount: string }>();
+
+    return {
+      spent: Number(row?.spent ?? 0),
+      expenseCount: Number(row?.expenseCount ?? 0),
+    };
   }
 
   /**
