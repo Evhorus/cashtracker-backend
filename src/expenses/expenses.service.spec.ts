@@ -45,6 +45,7 @@ describe('ExpensesService', () => {
       create: jest.fn(),
       findById: jest.fn(),
       findAll: jest.fn(),
+      calculateFilteredTotal: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
     };
@@ -138,6 +139,7 @@ describe('ExpensesService', () => {
   describe('findAll', () => {
     it('should return a paginated list of mapped expense responses', async () => {
       expensesRepository.findAll.mockResolvedValue([[mockExpense], 1]);
+      expensesRepository.calculateFilteredTotal.mockResolvedValue(10);
 
       const result = await service.findAll('envelope-123', {
         page: 1,
@@ -153,6 +155,7 @@ describe('ExpensesService', () => {
         totalPages: 1,
         hasNextPage: false,
         hasPreviousPage: false,
+        totalAmount: 10,
       });
       expect(expensesRepository.findAll).toHaveBeenCalledWith(
         'envelope-123',
@@ -160,10 +163,15 @@ describe('ExpensesService', () => {
         1,
         20,
       );
+      expect(expensesRepository.calculateFilteredTotal).toHaveBeenCalledWith(
+        'envelope-123',
+        {},
+      );
     });
 
     it('should pass filters through without page/limit', async () => {
       expensesRepository.findAll.mockResolvedValue([[mockExpense], 1]);
+      expensesRepository.calculateFilteredTotal.mockResolvedValue(10);
 
       await service.findAll('envelope-123', {
         page: 2,
@@ -177,6 +185,25 @@ describe('ExpensesService', () => {
         2,
         10,
       );
+      expect(expensesRepository.calculateFilteredTotal).toHaveBeenCalledWith(
+        'envelope-123',
+        { search: 'milk' },
+      );
+    });
+
+    it('should sum only the filtered set, not just the current page', async () => {
+      // The page in hand can be a partial slice of a filter that spans
+      // multiple pages - totalAmount must come from the repository's own
+      // full-set aggregate, not be derived from the mapped page here.
+      expensesRepository.findAll.mockResolvedValue([[mockExpense], 50]);
+      expensesRepository.calculateFilteredTotal.mockResolvedValue(123456.78);
+
+      const result = await service.findAll('envelope-123', {
+        page: 1,
+        limit: 20,
+      });
+
+      expect(result.meta.totalAmount).toBe(123456.78);
     });
   });
 });
