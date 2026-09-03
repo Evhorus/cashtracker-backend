@@ -268,3 +268,117 @@ describe('Dashboard category breakdown (e2e)', () => {
     expect(await breakdown({ currency: 'COP', year: '2020' })).toEqual([]);
   });
 });
+
+/**
+ * The by-name breakdown is also a GROUP BY, and `normalizeString` (run on
+ * every expense name at save time) only trims/collapses whitespace - it
+ * never touches casing. A bulk import (a bank statement, a PDF receipt
+ * log) or just inconsistent typing can easily save "Mercaldas" one time
+ * and "MERCALDAS" the next; only a real database proves the query still
+ * folds those into a single row instead of double-counting the merchant.
+ */
+describe('Dashboard name breakdown (e2e)', () => {
+  let app: INestApplication;
+  let dataSource: DataSource;
+
+  const mockUser = { id: 'user_test123' };
+
+  beforeAll(async () => {
+    assertSafeTestDatabase();
+
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(ClerkAuthGuard)
+      .useValue({
+        canActivate: (context) => {
+          const req = context.switchToHttp().getRequest();
+          req.user = mockUser;
+          return true;
+        },
+      })
+      .overrideGuard(ThrottlerGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
+
+    app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+
+    await app.init();
+    dataSource = moduleFixture.get<DataSource>(DataSource);
+  });
+
+  afterAll(async () => {
+    await dataSource.destroy();
+    await app.close();
+  });
+
+  afterEach(async () => {
+    await dataSource.query('DELETE FROM expense');
+    await dataSource.query('DELETE FROM envelope');
+  });
+
+  interface NameBreakdownRow {
+    name: string;
+    spent: number;
+    expenseCount: number;
+  }
+
+  async function nameBreakdown(query: Record<string, string>) {
+    const res = await request(app.getHttpServer())
+      .get('/dashboard/name-breakdown')
+      .query(query)
+      .expect(200);
+    return res.body as NameBreakdownRow[];
+  }
+
+  it('folds names that differ only by case into one row', async () => {
+    await request(app.getHttpServer())
+      .post('/envelopes')
+      .send({ name: 'Supermercado', amount: 1_000_000, currency: 'COP' })
+      .expect(201);
+
+    const list = await request(app.getHttpServer())
+      .get('/envelopes')
+      .query({ limit: 100 })
+      .expect(200);
+    const envelope = (
+      list.body as { data: { id: string; name: string }[] }
+    ).data.find((e) => e.name === 'Supermercado');
+    if (!envelope) throw new Error('seed envelope not created');
+
+    await request(app.getHttpServer())
+      .post(`/envelopes/${envelope.id}/expenses`)
+      .send({
+        name: 'Mercaldas',
+        amount: 100_000,
+        currency: 'COP',
+        date: '2026-08-01',
+      })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/envelopes/${envelope.id}/expenses`)
+      .send({
+        name: 'MERCALDAS',
+        amount: 50_000,
+        currency: 'COP',
+        date: '2026-08-10',
+      })
+      .expect(201);
+
+    const rows = await nameBreakdown({ currency: 'COP' });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toEqual({
+      name: 'mercaldas',
+      spent: 150_000,
+      expenseCount: 2,
+    });
+  });
+});
