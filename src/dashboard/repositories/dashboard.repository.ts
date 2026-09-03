@@ -205,8 +205,11 @@ export class DashboardRepository {
    * and how many expenses share it, one row per distinct name with
    * spending in the requested period/currency - surfaces recurring
    * expenses (e.g. "Arriendo" paid every month) as a single total.
-   * Names are already normalized on save (normalizeString), so grouping
-   * on the exact stored string needs no further merging here.
+   * `normalizeString` only trims/collapses whitespace on save, it never
+   * touches casing - "Mercaldas" and "MERCALDAS" are both valid stored
+   * values for the same merchant (typing habits, bulk imports from a
+   * bank export, ...). Grouping on `LOWER(expense.name)` instead of the
+   * raw column keeps those from splitting into separate rows here.
    */
   async getNameBreakdown(
     userId: string,
@@ -218,10 +221,10 @@ export class DashboardRepository {
       currency,
       filters,
     )
-      .select('expense.name', 'name')
+      .select('LOWER(expense.name)', 'name')
       .addSelect('COALESCE(SUM(expense.amount), 0)', 'spent')
       .addSelect('COUNT(*)', 'expenseCount')
-      .groupBy('expense.name')
+      .groupBy('LOWER(expense.name)')
       .orderBy('SUM(expense.amount)', 'DESC')
       .getRawMany<{ name: string; spent: string; expenseCount: string }>();
 
