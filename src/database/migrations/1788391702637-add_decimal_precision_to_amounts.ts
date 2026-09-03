@@ -13,9 +13,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * rows are cast in place - this pads/reformats, it never rounds, since no
  * existing value has more than 2 decimal places already.
  */
-export class AddDecimalPrecisionToAmounts1788391702637
-  implements MigrationInterface
-{
+export class AddDecimalPrecisionToAmounts1788391702637 implements MigrationInterface {
   name = 'AddDecimalPrecisionToAmounts1788391702637';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

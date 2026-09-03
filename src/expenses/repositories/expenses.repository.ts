@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, Repository, SelectQueryBuilder } from 'typeorm';
 import { Expense } from '../entities/expense.entity';
+
+interface ExpenseFilters {
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+  sort?: 'ASC' | 'DESC';
+}
 
 @Injectable()
 export class ExpensesRepository {
@@ -46,17 +53,16 @@ export class ExpensesRepository {
     return result && result.sum ? parseFloat(result.sum) : 0;
   }
 
-  async findAll(
+  /**
+   * The `envelopeId` + search/date-range conditions shared by `findAll`
+   * and `calculateFilteredTotal`. Sorting and pagination are deliberately
+   * left out here - they only ever apply to the page of rows being
+   * listed, never to the aggregate over the full filtered set.
+   */
+  private buildFilteredQuery(
     envelopeId: string,
-    filters: {
-      startDate?: string;
-      endDate?: string;
-      search?: string;
-      sort?: 'ASC' | 'DESC';
-    },
-    page: number,
-    limit: number,
-  ) {
+    filters: ExpenseFilters,
+  ): SelectQueryBuilder<Expense> {
     const query = this.repository.createQueryBuilder('expense');
 
     query.where('expense.envelopeId = :envelopeId', { envelopeId });
@@ -80,6 +86,17 @@ export class ExpensesRepository {
       );
     }
 
+    return query;
+  }
+
+  async findAll(
+    envelopeId: string,
+    filters: ExpenseFilters,
+    page: number,
+    limit: number,
+  ) {
+    const query = this.buildFilteredQuery(envelopeId, filters);
+
     // Most recent first by default - the conventional order for a
     // transaction/expense history (what did I just spend, not what did
     // I spend first), and what the frontend's own "Actividad reciente"
@@ -90,5 +107,19 @@ export class ExpensesRepository {
     query.skip((page - 1) * limit).take(limit);
 
     return query.getManyAndCount();
+  }
+
+  /**
+   * Sum of `amount` over the *entire* filtered result set (same
+   * search/date-range as `findAll`), not just the page in hand - a
+   * filter that spans more than one page would otherwise show a
+   * misleading partial total.
+   */
+  async calculateFilteredTotal(envelopeId: string, filters: ExpenseFilters) {
+    const result = await this.buildFilteredQuery(envelopeId, filters)
+      .select('SUM(expense.amount)', 'sum')
+      .getRawOne<{ sum: string }>();
+
+    return result && result.sum ? parseFloat(result.sum) : 0;
   }
 }
