@@ -159,7 +159,8 @@ describe('Expenses (e2e)', () => {
         .expect(200)
         .expect((res) => {
           expect(res.body).toHaveProperty('id', expenseId);
-          expect(res.body).toHaveProperty('name', 'Specific Expense');
+          // Name comes back lowercased - normalized on save.
+          expect(res.body).toHaveProperty('name', 'specific expense');
         });
     });
 

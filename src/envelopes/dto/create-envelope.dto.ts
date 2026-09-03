@@ -8,13 +8,13 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { normalizeString } from 'src/common/utils/string-utils';
+import { normalizeName, normalizeString } from 'src/common/utils/string-utils';
 import { Currency } from 'src/common/enums/currency.enum';
 
 export class CreateEnvelopeDto {
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => normalizeString(value))
+  @Transform(({ value }) => normalizeName(value))
   name: string;
 
   @IsEnum(Currency)

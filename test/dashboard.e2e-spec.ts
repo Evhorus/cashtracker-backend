@@ -350,7 +350,7 @@ describe('Dashboard name breakdown (e2e)', () => {
       .expect(200);
     const envelope = (
       list.body as { data: { id: string; name: string }[] }
-    ).data.find((e) => e.name === 'Supermercado');
+    ).data.find((e) => e.name === 'supermercado'); // normalized to lowercase on save
     if (!envelope) throw new Error('seed envelope not created');
 
     await request(app.getHttpServer())

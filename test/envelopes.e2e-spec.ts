@@ -191,7 +191,9 @@ describe('Envelopes (e2e)', () => {
         .expect((res) => {
           expect(res.body.meta.total).toBe(1);
           expect(res.body.data).toHaveLength(1);
-          expect(res.body.data[0]).toHaveProperty('name', 'Groceries');
+          // Names are normalized to lowercase on save (envelope/expense
+          // name is a merchant/thing identifier, not free text).
+          expect(res.body.data[0]).toHaveProperty('name', 'groceries');
           expect(res.body.data[0]).toHaveProperty('currency', 'COP');
           expect(parseFloat(res.body.data[0].spent)).toBe(0);
           expect(res.body.data[0]).not.toHaveProperty('userId'); // DTO doesn't expose userId
@@ -209,7 +211,7 @@ describe('Envelopes (e2e)', () => {
         .expect(200)
         .expect((res) => {
           const envelope = res.body.data.find(
-            (b: { name: string }) => b.name === 'No Limit',
+            (b: { name: string }) => b.name === 'no limit',
           );
           expect(envelope).toBeDefined();
           expect(envelope.amount).toBeNull();
@@ -255,7 +257,7 @@ describe('Envelopes (e2e)', () => {
         .expect(200)
         .expect((res) => {
           expect(res.body.meta.total).toBe(1);
-          expect(res.body.data[0]).toHaveProperty('name', 'Groceries');
+          expect(res.body.data[0]).toHaveProperty('name', 'groceries');
         });
 
       // Matches by category, case-insensitively
@@ -265,7 +267,7 @@ describe('Envelopes (e2e)', () => {
         .expect(200)
         .expect((res) => {
           expect(res.body.meta.total).toBe(1);
-          expect(res.body.data[0]).toHaveProperty('name', 'Rent');
+          expect(res.body.data[0]).toHaveProperty('name', 'rent');
         });
 
       // No match
@@ -591,7 +593,8 @@ describe('Envelopes (e2e)', () => {
 
       // ON DELETE SET NULL - the envelope survives, it just stops being
       // classified, rather than pointing at a category that is gone.
-      expect(envelope.name).toBe('Streaming');
+      // (name comes back lowercased - normalized on save.)
+      expect(envelope.name).toBe('streaming');
       expect(envelope.category).toBeNull();
     });
 
