@@ -20,7 +20,6 @@
     "test:e2e": "NODE_ENV=test jest --config ./test/jest-e2e.json --runInBand",
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
     "migration": "ts-node scripts/migration-master.ts",
-    "backup": "bash scripts/backup-db.sh",
     "restore": "bash scripts/restore-db.sh"
   },
   "dependencies": {

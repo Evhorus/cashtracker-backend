@@ -30,7 +30,7 @@ this file directly.
 ### Database Backups
 - Automated: `.github/workflows/db-backup.yml` runs daily at 08:00 UTC (and on demand) and calls `scripts/backup-db-r2.sh`: `pg_dump -F c` of production, verified with `pg_restore --list`, uploaded to the private R2 bucket `cashtracker-db-backups` under `cashtracker/` (`cashtracker-prod-YYYYMMDD-HHMMSS.dump`), remote rotation at 30 days. It retries the dump for ~5 minutes so a suspended Neon compute can wake up.
 - Repo secrets: `DATABASE_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET`, optional `HEALTHCHECK_URL`. The R2 token is scoped to that bucket only; if it expires the job fails until it is renewed.
-- Manual local backup: `pnpm backup` (`scripts/backup-db.sh`, into the git-ignored `backups/`). Restore: `pnpm restore "<target_url>" [dump]` (no `--` after `restore`; use Neon's direct connection, not the `-pooler` host). Steps and a row-count check are in the README ("Backups").
+- Extra backup on demand: run the workflow (Actions → DB backup → Run workflow). Restore: `pnpm restore "<target_url>" [dump]` (no `--` after `restore`; use Neon's direct connection, not the `-pooler` host). Steps and a row-count check are in the README ("Backups").
 - Do not put production `DATABASE_URL` values in local files or logs; the scheduled job is how production data is read.
 
 ## Architecture & Structure

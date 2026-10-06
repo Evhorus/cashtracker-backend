@@ -163,7 +163,7 @@ Secrets del repositorio: `DATABASE_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_K
 está limitado a ese bucket; si vence, los backups fallan hasta renovarlo (crear uno nuevo en Cloudflare →
 R2 → *Manage API tokens* y volver a cargar los dos secrets `R2_*`).
 
-**Manual (local).** `pnpm backup` guarda un dump en `backups/` (ignorada por git: puede tener datos reales).
+**Backup extra a demanda.** Lanza el workflow a mano (Actions → *DB backup* → *Run workflow*) y baja el dump de R2. `backups/` (ignorada por git) es donde se dejan los dumps descargados para restaurar.
 
 ### Restaurar un backup
 
