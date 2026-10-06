@@ -4,8 +4,6 @@ on:
   schedule:
     - cron: '0 8 * * *' # daily, 08:00 UTC
   workflow_dispatch:
-  push: # TEMPORARY: test run from the branch before merging; remove before merge
-    branches: [chore/db-backup-r2]
 
 permissions:
   contents: read
