@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Restores a pg_dump -F c backup (see scripts/backup-db.sh) into an explicit
+# Restores a pg_dump -F c backup (as uploaded to R2 by scripts/backup-db-r2.sh) into an explicit
 # target database, via Docker (no local Postgres client required).
 #
 # Usage:
