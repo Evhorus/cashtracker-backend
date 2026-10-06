@@ -189,7 +189,7 @@ y pide una confirmación extra (`SI`) si el destino es el host de producción de
    Sin el segundo argumento usa el dump más reciente de `backups/`. El destino se pega a mano: nunca se
    lee del `.env`.
 4. **Comprobar.** Conecta a la base restaurada y revisa los conteos (por ejemplo `select count(*)` en
-   `envelopes` y `expenses`) contra los de producción antes de apuntar la app a ella.
+   `envelope` y `expense`) contra los de producción antes de apuntar la app a ella.
 
 ## API Endpoints
 
