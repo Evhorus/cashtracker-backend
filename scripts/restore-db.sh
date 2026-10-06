@@ -4,7 +4,7 @@
 #
 # Usage:
 #   scripts/restore-db.sh "<target_connection_string>" [dump_file]
-#   pnpm restore -- "<target_connection_string>" [dump_file]
+#   pnpm restore "<target_connection_string>" [dump_file]
 #
 # - target_connection_string is REQUIRED and must be typed/pasted explicitly -
 #   it is never read from .env, so a restore can't silently land on whatever

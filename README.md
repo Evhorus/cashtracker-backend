@@ -184,10 +184,12 @@ y pide una confirmación extra (`SI`) si el destino es el host de producción de
    ```
 3. **Restaurar.**
    ```bash
-   pnpm restore -- "<connection string de destino>" <archivo>.dump
+   pnpm restore "<connection string de destino>" <archivo>.dump
    ```
    Sin el segundo argumento usa el dump más reciente de `backups/`. El destino se pega a mano: nunca se
-   lee del `.env`.
+   lee del `.env`. Usa la conexión **directa** de Neon (host sin `-pooler`; en el diálogo *Connect* desmarca
+   *Connection pooling*): el pooler no sirve para `pg_restore`. No pongas `--` después de `pnpm restore`:
+   el script lo tomaría como la base de destino.
 4. **Comprobar.** Conecta a la base restaurada y revisa los conteos (por ejemplo `select count(*)` en
    `envelope` y `expense`) contra los de producción antes de apuntar la app a ella.
 
