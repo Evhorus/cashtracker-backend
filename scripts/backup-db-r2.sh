@@ -46,7 +46,22 @@ pg() {
   docker run --rm -i -e DEBIAN_FRONTEND=noninteractive -e DATABASE_URL="$URL" -v "$DIR":/b "$PG_IMAGE" "$@"
 }
 
-pg sh -c 'apt-get update -qq && apt-get install -y -qq ca-certificates >/dev/null && update-ca-certificates >/dev/null && pg_dump "$DATABASE_URL" -F c -f "/b/'"$NAME"'"'
+# A suspended Neon compute wakes on the first connection and can take a while (or refuse the first
+# attempts): wait for it, up to DUMP_ATTEMPTS x DUMP_WAIT_SECONDS (~5 min). It fails only after that,
+# meaning the database is really unreachable (deleted, credentials rotated), and the last error stays in the log.
+DUMP_ATTEMPTS=20
+DUMP_WAIT_SECONDS=15
+for attempt in $(seq 1 "$DUMP_ATTEMPTS"); do
+  if pg sh -c 'apt-get update -qq && apt-get install -y -qq ca-certificates >/dev/null && update-ca-certificates >/dev/null && pg_dump "$DATABASE_URL" -F c -f "/b/'"$NAME"'"'; then
+    break
+  fi
+  if [ "$attempt" -eq "$DUMP_ATTEMPTS" ]; then
+    echo "Error: pg_dump failed $DUMP_ATTEMPTS times; the database is not reachable." >&2
+    false
+  fi
+  echo "$(date -u +%FT%TZ) dump attempt $attempt/$DUMP_ATTEMPTS failed, retrying in ${DUMP_WAIT_SECONDS}s"
+  sleep "$DUMP_WAIT_SECONDS"
+done
 pg pg_restore --list "/b/$NAME" > "$DIR/list.txt"   # fail if the dump is unreadable
 [ -s "$DIR/list.txt" ] || { echo "Error: $NAME looks empty." >&2; false; }
 echo "$(date -u +%FT%TZ) ok dump $NAME $(du -h "$DIR/$NAME" | cut -f1), $(wc -l < "$DIR/list.txt") entries"

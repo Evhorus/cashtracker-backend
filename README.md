@@ -149,6 +149,50 @@ pnpm migration revert
 pnpm migration show
 ```
 
+## Backups
+
+**Automático.** El workflow `.github/workflows/db-backup.yml` corre todos los días a las 08:00 UTC
+(03:00 en Colombia), también se puede lanzar a mano (Actions → *DB backup* → *Run workflow*). Ejecuta
+`scripts/backup-db-r2.sh`: hace `pg_dump -F c` de producción, lo verifica con `pg_restore --list`, lo sube
+al bucket privado `cashtracker-db-backups` de Cloudflare R2 (carpeta `cashtracker/`, archivos
+`cashtracker-prod-YYYYMMDD-HHMMSS.dump`) y borra los de más de 30 días. Si la base de Neon está suspendida,
+espera hasta ~5 minutos a que despierte antes de fallar.
+
+Secrets del repositorio: `DATABASE_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`
+(`https://<account_id>.r2.cloudflarestorage.com`), `R2_BUCKET` y, opcional, `HEALTHCHECK_URL`. El token de R2
+está limitado a ese bucket; si vence, los backups fallan hasta renovarlo (crear uno nuevo en Cloudflare →
+R2 → *Manage API tokens* y volver a cargar los dos secrets `R2_*`).
+
+**Manual (local).** `pnpm backup` guarda un dump en `backups/` (ignorada por git: puede tener datos reales).
+
+### Restaurar un backup
+
+Nunca restaures encima de producción sin querer: `scripts/restore-db.sh` exige indicar la base de destino
+y pide una confirmación extra (`SI`) si el destino es el host de producción del `.env`.
+
+1. **Base de destino.** En Neon crea un proyecto o una base temporal y copia su connection string.
+2. **Descargar el dump.** Opción A, sin comandos: Cloudflare → R2 → `cashtracker-db-backups` → carpeta
+   `cashtracker/` → el archivo más reciente → *Download*, y déjalo en `backups/`. Opción B, por consola:
+   ```bash
+   export AWS_ACCESS_KEY_ID=<access key id> AWS_SECRET_ACCESS_KEY=<secret> AWS_DEFAULT_REGION=auto
+   EP=https://<account_id>.r2.cloudflarestorage.com
+   docker run --rm -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION amazon/aws-cli:2.37.0 \
+     --endpoint-url $EP s3 ls s3://cashtracker-db-backups/cashtracker/
+   mkdir -p backups
+   docker run --rm -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION -v "$PWD/backups:/b" \
+     amazon/aws-cli:2.37.0 --endpoint-url $EP s3 cp s3://cashtracker-db-backups/cashtracker/<archivo>.dump /b/
+   ```
+3. **Restaurar.**
+   ```bash
+   pnpm restore "<connection string de destino>" <archivo>.dump
+   ```
+   Sin el segundo argumento usa el dump más reciente de `backups/`. El destino se pega a mano: nunca se
+   lee del `.env`. Usa la conexión **directa** de Neon (host sin `-pooler`; en el diálogo *Connect* desmarca
+   *Connection pooling*): el pooler no sirve para `pg_restore`. No pongas `--` después de `pnpm restore`:
+   el script lo tomaría como la base de destino.
+4. **Comprobar.** Conecta a la base restaurada y revisa los conteos (por ejemplo `select count(*)` en
+   `envelope` y `expense`) contra los de producción antes de apuntar la app a ella.
+
 ## API Endpoints
 
 ### Health Check
