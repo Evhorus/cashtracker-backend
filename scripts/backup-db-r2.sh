@@ -34,9 +34,12 @@ for v in DATABASE_URL R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_ENDPOINT R2_BUCKE
   fi
 done
 
-# The postgres image has no CA certificates: use the system bundle installed below so
-# `sslmode=verify-full` (kept, not weakened) can verify the Neon certificate.
-URL="${DATABASE_URL}&sslrootcert=system"
+# The postgres image has no CA certificates: when the URL asks to verify the certificate, point it
+# at the system bundle installed below (libpq rejects sslrootcert=system with a weaker sslmode).
+URL="$DATABASE_URL"
+case "$URL" in
+  *sslmode=verify-full*|*sslmode=verify-ca*) URL="${URL}&sslrootcert=system" ;;
+esac
 NAME="cashtracker-prod-$(date -u +%Y%m%d-%H%M%S).dump"
 
 pg() {
