@@ -18,6 +18,7 @@ this file directly.
 ### CI and branch protection
 - `.github/workflows/ci.yml` runs on every PR and push to `main`: `verify` (typecheck, lint:check, format:check, unit tests, build) and `e2e` (the e2e suites against a throwaway Postgres service container, no secrets).
 - `main` is protected by the "protect main" ruleset: changes land through a PR, squash merge only, and both `verify` and `e2e` must pass. A merge to `main` deploys to Render, so this is the gate in front of production.
+- Dependabot (`.github/dependabot.yml`) opens weekly PRs on Monday: one grouped PR for npm minor/patch bumps, one for GitHub Actions, and one PR per npm major. `.github/workflows/dependabot-auto-merge.yml` enables auto-merge on everything below a major, so those merge (and deploy) by themselves once `verify` and `e2e` pass; majors stay open for review. The Dockerfile's `NODE_VERSION` is not covered (Dependabot cannot resolve an ARG-built tag): bump it by hand.
 
 ### Testing
 - Run all unit tests: `pnpm run test`
