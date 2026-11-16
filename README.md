@@ -233,9 +233,10 @@ y pide una confirmación extra (`SI`) si el destino es el host de producción de
 - **Migraciones:** Gestión de esquema mediante TypeORM CLI
 - **Validación:** class-validator, class-transformer, Zod
 - **Testing:** Jest, Supertest
-- **Seguridad y confiabilidad:** Helmet (cabeceras HTTP), `@nestjs/throttler`
-  (rate limiting global) y `@nestjs/schedule` + `fetch` nativo de Node (ping
-  periódico de keep-alive para evitar la hibernación en free tiers)
+- **Seguridad y confiabilidad:** Helmet (cabeceras HTTP) y `@nestjs/schedule` +
+  `fetch` nativo de Node (ping periódico de keep-alive para evitar la
+  hibernación en free tiers). Sin rate limiting propio por ahora: ver
+  "Rate Limiting" en `AGENTS.md`.
 
 ## Características
 
