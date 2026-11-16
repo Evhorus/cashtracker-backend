@@ -397,3 +397,184 @@ describe('Dashboard name breakdown (e2e)', () => {
     });
   });
 });
+
+/**
+ * The summary has to read the same whichever way someone organises
+ * envelopes - the app has both styles in use:
+ *
+ * - one envelope per month ("Octubre - Davi Scoti"), created in the month
+ *   its expenses fall in;
+ * - one long-lived envelope per purpose ("Aseo", "Arriendo") that collects
+ *   every month's expenses.
+ *
+ * Anything "over time" (the monthly chart, the year filter, the years on
+ * offer) therefore follows each expense's own date. It used to follow the
+ * envelope's creation date, which put a whole year of a long-lived
+ * envelope into the month it was created. The envelope totals (assigned,
+ * spent, available, exceeded) are the envelopes' current state and are
+ * not date-filtered at all.
+ */
+describe('Dashboard summary (e2e)', () => {
+  let app: INestApplication;
+  let dataSource: DataSource;
+
+  const mockUser = { id: 'user_test_summary' };
+
+  beforeAll(async () => {
+    assertSafeTestDatabase();
+
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(ClerkAuthGuard)
+      .useValue({
+        canActivate: (context) => {
+          const req = context.switchToHttp().getRequest();
+          req.user = mockUser;
+          return true;
+        },
+      })
+      .compile();
+
+    app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+
+    await app.init();
+    dataSource = moduleFixture.get<DataSource>(DataSource);
+  });
+
+  afterAll(async () => {
+    await dataSource.destroy();
+    await app.close();
+  });
+
+  afterEach(async () => {
+    await dataSource.query('DELETE FROM expense');
+    await dataSource.query('DELETE FROM envelope');
+  });
+
+  interface Summary {
+    totalEnvelopes: number;
+    totals: {
+      currency: string;
+      totalAssigned: number;
+      totalSpent: number;
+      totalAvailable: number;
+      totalExceeded: number;
+    }[];
+    chart: { month: string; spent: number }[];
+    chartCurrency: string | null;
+    availableYears: number[];
+  }
+
+  /** Creates an envelope and backdates it, since created_at is set by
+   * the database and cannot be sent through the API. */
+  async function createEnvelope(
+    name: string,
+    amount: number | null,
+    createdAt: string,
+  ) {
+    await request(app.getHttpServer())
+      .post('/envelopes')
+      .send({ name, amount, currency: 'COP' })
+      .expect(201);
+    const [{ id }] = await dataSource.query(
+      'SELECT id FROM envelope WHERE "userId" = $1 ORDER BY created_at DESC LIMIT 1',
+      [mockUser.id],
+    );
+    await dataSource.query(
+      'UPDATE envelope SET created_at = $2 WHERE id = $1',
+      [id, createdAt],
+    );
+    return id as string;
+  }
+
+  async function addExpense(envelopeId: string, amount: number, date: string) {
+    await request(app.getHttpServer())
+      .post(`/envelopes/${envelopeId}/expenses`)
+      .send({ name: 'Item', amount, currency: 'COP', date })
+      .expect(201);
+  }
+
+  async function summary(query: Record<string, string> = {}) {
+    const res = await request(app.getHttpServer())
+      .get('/dashboard/summary')
+      .query(query)
+      .expect(200);
+    return res.body as Summary;
+  }
+
+  it('charts a long-lived envelope by the month each expense happened', async () => {
+    const aseo = await createEnvelope('Aseo', 1_000_000, '2026-01-10');
+    await addExpense(aseo, 100, '2026-01-15');
+    await addExpense(aseo, 200, '2026-03-02');
+    await addExpense(aseo, 300, '2026-03-20');
+    await addExpense(aseo, 400, '2026-06-01');
+
+    const { chart } = await summary();
+
+    expect(chart).toEqual([
+      { month: '2026-01', spent: 100 },
+      { month: '2026-03', spent: 500 },
+      { month: '2026-06', spent: 400 },
+    ]);
+  });
+
+  it('charts one-envelope-per-month the same way it always read', async () => {
+    const sept = await createEnvelope('Septiembre', 500_000, '2026-09-01');
+    const oct = await createEnvelope('Octubre', 500_000, '2026-10-01');
+    await addExpense(sept, 120_000, '2026-09-12');
+    await addExpense(oct, 80_000, '2026-10-03');
+    await addExpense(oct, 70_000, '2026-10-25');
+
+    const { chart } = await summary();
+
+    expect(chart).toEqual([
+      { month: '2026-09', spent: 120_000 },
+      { month: '2026-10', spent: 150_000 },
+    ]);
+  });
+
+  it('filters the chart and the years on offer by expense date', async () => {
+    const aseo = await createEnvelope('Aseo', null, '2025-11-01');
+    await addExpense(aseo, 100, '2025-12-20');
+    await addExpense(aseo, 200, '2026-02-01');
+
+    const all = await summary();
+    expect(all.availableYears).toEqual([2026, 2025]);
+
+    const in2026 = await summary({ year: '2026' });
+    expect(in2026.chart).toEqual([{ month: '2026-02', spent: 200 }]);
+    // Envelope state is not date-filtered: the envelope still exists and
+    // still holds both expenses.
+    expect(in2026.totalEnvelopes).toBe(1);
+    expect(in2026.totals[0].totalSpent).toBe(300);
+  });
+
+  it('reports what is left and what was overspent separately', async () => {
+    // 100 left in one envelope, 50 over in another. Netting them (the
+    // old "available" did) showed 50 and hid both facts.
+    const room = await createEnvelope('Con saldo', 300, '2026-10-01');
+    const over = await createEnvelope('Pasado', 200, '2026-10-01');
+    const unlimited = await createEnvelope('Sin límite', null, '2026-10-01');
+    await addExpense(room, 200, '2026-10-05');
+    await addExpense(over, 250, '2026-10-06');
+    await addExpense(unlimited, 999, '2026-10-07');
+
+    const [cop] = (await summary()).totals;
+
+    expect(cop).toMatchObject({
+      currency: 'COP',
+      totalAssigned: 500,
+      totalSpent: 1449,
+      totalAvailable: 100,
+      totalExceeded: 50,
+    });
+  });
+});

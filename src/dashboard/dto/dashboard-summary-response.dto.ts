@@ -1,7 +1,6 @@
 /**
- * One bar's worth of chart data: total spent vs. still available
- * (summed across capped envelopes only) for one calendar month.
- * Chronologically ascending. Scoped to one currency at a time - see
+ * One bar's worth of chart data: what was spent in one calendar month,
+ * by each expense's own date. Chronologically ascending. Scoped to one currency at a time - see
  * `chartCurrency` on DashboardSummaryResponseDto for which one.
  */
 export class DashboardChartEntryDto {
@@ -9,7 +8,6 @@ export class DashboardChartEntryDto {
    * name: the client owns how (and in which language) it reads. */
   month: string;
   spent: number;
-  available: number;
 }
 
 /**
@@ -22,7 +20,7 @@ export class DashboardChartEntryDto {
 export class DashboardCurrencyTotalsDto {
   currency: string;
 
-  /** Count of envelopes in this currency (in `year`, if filtered). */
+  /** Count of envelopes in this currency. */
   totalEnvelopes: number;
 
   /** Sum of `amount` across envelopes in this currency that have a spending limit. */
@@ -39,11 +37,17 @@ export class DashboardCurrencyTotalsDto {
 
   /** Sum of `spent` across only the capped envelopes in this currency -
    * the portion of totalSpent that actually counts against
-   * totalAssigned. totalAvailable = totalAssigned - totalSpentCapped. */
+   * totalAssigned. */
   totalSpentCapped: number;
 
-  /** totalAssigned minus totalSpentCapped, for this currency. */
+  /** What is still left in capped envelopes that are under their limit:
+   * the sum of max(amount - spent, 0). Never negative. */
   totalAvailable: number;
+
+  /** How far capped envelopes over their limit went past it: the sum of
+   * max(spent - amount, 0). Reported apart from totalAvailable instead of
+   * netted against it, so neither fact hides the other. */
+  totalExceeded: number;
 }
 
 /**
@@ -52,15 +56,16 @@ export class DashboardCurrencyTotalsDto {
  * envelope list.
  */
 export class DashboardSummaryResponseDto {
-  /** Count of envelopes (in `year`, if filtered) - currency-agnostic,
-   * unlike `totals` below. */
+  /** Count of envelopes - currency-agnostic, unlike `totals` below.
+   * Envelope state is never date-filtered; `year` scopes only `chart`. */
   totalEnvelopes: number;
 
   /** One entry per currency the user has envelopes in. Empty when the
    * user has no envelopes at all. */
   totals: DashboardCurrencyTotalsDto[];
 
-  /** Spending by month, most recent months, chronologically ascending. */
+  /** Spending by month of each expense's date, most recent months,
+   * chronologically ascending. */
   chart: DashboardChartEntryDto[];
 
   /**
@@ -74,6 +79,6 @@ export class DashboardSummaryResponseDto {
    */
   chartCurrency: string | null;
 
-  /** Distinct years the user has envelopes in, DESC - for a year picker. */
+  /** Distinct years the user has expenses in, DESC - for a year picker. */
   availableYears: number[];
 }
