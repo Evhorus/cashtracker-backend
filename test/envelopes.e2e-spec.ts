@@ -57,6 +57,10 @@ describe('Envelopes (e2e)', () => {
     // NODE_ENV=test itself.
     await dataSource.query('DELETE FROM expense');
     await dataSource.query('DELETE FROM envelope');
+    // Personal categories too: they outlived the run, so a test that
+    // renames one collided (409) with the previous run's leftover.
+    // Global ones (userId NULL) are seeded data and stay.
+    await dataSource.query('DELETE FROM category WHERE "userId" IS NOT NULL');
   });
 
   /**

@@ -57,6 +57,10 @@ describe('Dashboard category breakdown (e2e)', () => {
   afterEach(async () => {
     await dataSource.query('DELETE FROM expense');
     await dataSource.query('DELETE FROM envelope');
+    // Personal categories too: they outlived the run, so a test that
+    // renames one collided (409) with the previous run's leftover.
+    // Global ones (userId NULL) are seeded data and stay.
+    await dataSource.query('DELETE FROM category WHERE "userId" IS NOT NULL');
     // Personal categories only - the global set (userId IS NULL) is
     // seeded data every user shares.
     await dataSource.query('DELETE FROM category WHERE "userId" IS NOT NULL');
@@ -337,6 +341,10 @@ describe('Dashboard name breakdown (e2e)', () => {
   afterEach(async () => {
     await dataSource.query('DELETE FROM expense');
     await dataSource.query('DELETE FROM envelope');
+    // Personal categories too: they outlived the run, so a test that
+    // renames one collided (409) with the previous run's leftover.
+    // Global ones (userId NULL) are seeded data and stay.
+    await dataSource.query('DELETE FROM category WHERE "userId" IS NOT NULL');
   });
 
   interface NameBreakdownRow {
@@ -457,6 +465,10 @@ describe('Dashboard summary (e2e)', () => {
   afterEach(async () => {
     await dataSource.query('DELETE FROM expense');
     await dataSource.query('DELETE FROM envelope');
+    // Personal categories too: they outlived the run, so a test that
+    // renames one collided (409) with the previous run's leftover.
+    // Global ones (userId NULL) are seeded data and stay.
+    await dataSource.query('DELETE FROM category WHERE "userId" IS NOT NULL');
   });
 
   interface Summary {

@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsPositive,
   IsString,
+  IsUUID,
   Max,
 } from 'class-validator';
 import { normalizeName, normalizeString } from 'src/common/utils/string-utils';
@@ -38,4 +39,13 @@ export class CreateExpenseDto {
   @IsNotEmpty()
   @IsCalendarDate()
   date: Date;
+
+  /** Optional. `null` (or '') clears it on an update; omitted leaves it
+   * unchanged. Ownership is checked in the service. */
+  @IsOptional()
+  @IsUUID()
+  @Transform(({ value }: { value: unknown }) =>
+    value === '' ? null : (value as string | null),
+  )
+  paymentMethodId?: string | null;
 }

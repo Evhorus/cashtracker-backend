@@ -13,12 +13,14 @@ import { ExpensesPaginatedResponseDto } from './dto/expenses-paginated-response.
 import { GetExpensesFilterDto } from './dto/get-expenses-filter.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
 import { ExpensesRepository } from './repositories/expenses.repository';
+import { PaymentMethodsRepository } from '../payment-methods/repositories/payment-methods.repository';
 
 @Injectable()
 export class ExpensesService {
   constructor(
     private readonly expensesRepository: ExpensesRepository,
     private readonly envelopesRepository: EnvelopesRepository,
+    private readonly paymentMethodsRepository: PaymentMethodsRepository,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -72,10 +74,34 @@ export class ExpensesService {
     return expense;
   }
 
+  /**
+   * A payment method id is a well-formed uuid by the time it gets here,
+   * but it must also belong to the envelope's owner - someone else's is
+   * a 404, the same as one that doesn't exist. null/undefined (clear /
+   * leave unchanged) is always fine.
+   */
+  private async assertPaymentMethodIsUsable(
+    userId: string,
+    paymentMethodId?: string | null,
+  ) {
+    if (!paymentMethodId) return;
+    const method = await this.paymentMethodsRepository.findForUserById(
+      userId,
+      paymentMethodId,
+    );
+    if (!method) {
+      throw new NotFoundException(ERROR_MESSAGES.PAYMENT_METHOD_NOT_FOUND);
+    }
+  }
+
   async create(envelopeId: string, createExpenseDto: CreateExpenseDto) {
     return this.dataSource.transaction(async (manager) => {
       const envelope = await this.lockEnvelope(envelopeId, manager);
       this.assertSameCurrency(envelope, createExpenseDto.currency);
+      await this.assertPaymentMethodIsUsable(
+        envelope.userId,
+        createExpenseDto.paymentMethodId,
+      );
 
       await this.expensesRepository.create(
         { ...createExpenseDto, envelopeId },
@@ -138,6 +164,10 @@ export class ExpensesService {
     return this.dataSource.transaction(async (manager) => {
       const lockedEnvelope = await this.lockEnvelope(envelope.id, manager);
       this.assertSameCurrency(lockedEnvelope, updateExpenseDto.currency);
+      await this.assertPaymentMethodIsUsable(
+        lockedEnvelope.userId,
+        updateExpenseDto.paymentMethodId,
+      );
       await this.findExpenseInEnvelope(envelope.id, expenseId, manager);
 
       await this.expensesRepository.update(

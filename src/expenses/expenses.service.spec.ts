@@ -8,11 +8,13 @@ import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
 import { Envelope } from '../envelopes/entities/envelope.entity';
 import { Expense } from './entities/expense.entity';
 import { Currency } from 'src/common/enums/currency.enum';
+import { PaymentMethodsRepository } from '../payment-methods/repositories/payment-methods.repository';
 
 describe('ExpensesService', () => {
   let service: ExpensesService;
   let expensesRepository: jest.Mocked<ExpensesRepository>;
   let envelopesRepository: jest.Mocked<EnvelopesRepository>;
+  let paymentMethodsRepository: jest.Mocked<PaymentMethodsRepository>;
   let dataSource: jest.Mocked<DataSource>;
   let entityManager: EntityManager;
 
@@ -71,6 +73,10 @@ describe('ExpensesService', () => {
         ExpensesService,
         { provide: ExpensesRepository, useValue: mockExpensesRepo },
         { provide: EnvelopesRepository, useValue: mockEnvelopesRepo },
+        {
+          provide: PaymentMethodsRepository,
+          useValue: { findForUserById: jest.fn() },
+        },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
@@ -78,6 +84,7 @@ describe('ExpensesService', () => {
     service = module.get<ExpensesService>(ExpensesService);
     expensesRepository = module.get(ExpensesRepository);
     envelopesRepository = module.get(EnvelopesRepository);
+    paymentMethodsRepository = module.get(PaymentMethodsRepository);
     dataSource = module.get(DataSource);
     entityManager = mockEntityManager;
   });
@@ -126,6 +133,33 @@ describe('ExpensesService', () => {
       );
       expect(expensesRepository.create).not.toHaveBeenCalled();
       expect(envelopesRepository.recalculateSpent).not.toHaveBeenCalled();
+    });
+
+    it("rejects a payment method that is not the envelope owner's", async () => {
+      envelopesRepository.findByIdForUpdate.mockResolvedValue(mockEnvelope);
+      paymentMethodsRepository.findForUserById.mockResolvedValue(null);
+
+      await expect(
+        service.create('envelope-123', {
+          ...createDto,
+          paymentMethodId: '5b8e2c4e-1f3a-4c7e-9d2b-8a6f0e1c2d3b',
+        }),
+      ).rejects.toThrow(
+        new NotFoundException(ERROR_MESSAGES.PAYMENT_METHOD_NOT_FOUND),
+      );
+      expect(paymentMethodsRepository.findForUserById).toHaveBeenCalledWith(
+        mockEnvelope.userId,
+        '5b8e2c4e-1f3a-4c7e-9d2b-8a6f0e1c2d3b',
+      );
+      expect(expensesRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('does not look up a payment method when none is sent', async () => {
+      envelopesRepository.findByIdForUpdate.mockResolvedValue(mockEnvelope);
+
+      await service.create('envelope-123', createDto);
+
+      expect(paymentMethodsRepository.findForUserById).not.toHaveBeenCalled();
     });
 
     it('fails with 404 if the envelope disappeared before the lock', async () => {
