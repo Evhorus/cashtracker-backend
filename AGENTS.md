@@ -96,7 +96,7 @@ envelopes and expenses) so it's a lighter version of this shape.
 - **Validation**: Zod 4 (Environment variable validation) and `class-validator` (DTO-level request validation).
 - **Testing**: Jest 30 and Supertest 7 (Unit and end-to-end testing).
 - **Scheduling**: `@nestjs/schedule` (`@Cron`) drives the health-check keep-alive ping.
-- **Rate Limiting**: `@nestjs/throttler`, configured globally (60 requests/60s) in `AppModule`.
+- **Rate Limiting**: none in the app, deliberately (owner's decision, 2026-11-16). `@nestjs/throttler` used to be configured but its guard was never registered, so it limited nothing while the docs claimed 60 req/min; it was removed rather than switched on. Why that is safe today: sign-in, sign-up and password reset are Clerk's endpoints and rate-limited by Clerk; the only public route here is `/health-check`, which touches no database; unauthenticated requests are rejected by `ClerkAuthGuard` before any query; and the app has a single user. **Add it when the app gets more users**: a generous per-user limit (tracker keyed on `req.user.id`, not IP - every request arrives from the Next.js server), registered as an `APP_GUARD` after `ClerkAuthGuard` so `req.user` is set.
 - **Outbound HTTP**: Node's built-in `fetch` (no HTTP client dependency), used only by the health-check self-ping.
 - **Security Headers**: `helmet`, applied globally in `main.ts`.
 

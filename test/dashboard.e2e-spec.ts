@@ -5,7 +5,6 @@ import { AppModule } from '../src/app.module';
 import { assertSafeTestDatabase } from './assert-safe-test-database';
 import { DataSource } from 'typeorm';
 import { ClerkAuthGuard } from '../src/auth/guards/clerk-auth.guard';
-import { ThrottlerGuard } from '@nestjs/throttler';
 
 /**
  * The category breakdown is a GROUP BY, so only a real database proves
@@ -35,8 +34,6 @@ describe('Dashboard category breakdown (e2e)', () => {
           return true;
         },
       })
-      .overrideGuard(ThrottlerGuard)
-      .useValue({ canActivate: () => true })
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -298,8 +295,6 @@ describe('Dashboard name breakdown (e2e)', () => {
           return true;
         },
       })
-      .overrideGuard(ThrottlerGuard)
-      .useValue({ canActivate: () => true })
       .compile();
 
     app = moduleFixture.createNestApplication();
