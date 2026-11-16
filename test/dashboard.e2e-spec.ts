@@ -68,7 +68,7 @@ describe('Dashboard category breakdown (e2e)', () => {
   interface BreakdownRow {
     category: { id: string; label: string; color: string; icon: string } | null;
     spent: number;
-    envelopeCount: number;
+    expenseCount: number;
   }
 
   /** Creates a category and returns its id - envelopes reference
@@ -155,9 +155,10 @@ describe('Dashboard category breakdown (e2e)', () => {
 
     const rows = await breakdown({ currency: 'COP' });
 
-    // Two envelopes summed into one row, and 500 > 400 puts it first.
+    // Two envelopes (one expense each) summed into one row, and 500 > 400
+    // puts it first.
     expect(
-      rows.map((r) => [r.category?.label, r.spent, r.envelopeCount]),
+      rows.map((r) => [r.category?.label, r.spent, r.expenseCount]),
     ).toEqual([
       ['Hogar', 500, 2],
       ['Transporte', 400, 1],
@@ -190,7 +191,7 @@ describe('Dashboard category breakdown (e2e)', () => {
     expect(rows).toContainEqual({
       category: null,
       spent: 150,
-      envelopeCount: 1,
+      expenseCount: 1,
     });
   });
 
@@ -205,7 +206,7 @@ describe('Dashboard category breakdown (e2e)', () => {
     const rows = await breakdown({ currency: 'COP' });
 
     expect(rows).toHaveLength(1);
-    expect(rows[0].envelopeCount).toBe(2);
+    expect(rows[0].expenseCount).toBe(2);
   });
 
   it('excludes envelopes with nothing spent', async () => {

@@ -8,11 +8,16 @@ this file directly.
 
 ### General
 - Build project: `pnpm run build`
-- Format code: `pnpm run format`
-- Lint code: `pnpm run lint`
+- Format code: `pnpm run format` (write) / `pnpm run format:check` (verify)
+- Lint code: `pnpm run lint` (with `--fix`) / `pnpm run lint:check` (verify)
+- Typecheck: `pnpm run typecheck`
 - Start in dev mode: `pnpm run start:dev`
 - Start in debug mode: `pnpm run start:debug`
 - Start in production mode: `pnpm run start:prod`
+
+### CI and branch protection
+- `.github/workflows/ci.yml` runs on every PR and push to `main`: `verify` (typecheck, lint:check, format:check, unit tests, build) and `e2e` (the e2e suites against a throwaway Postgres service container, no secrets).
+- `main` is protected by the "protect main" ruleset: changes land through a PR, squash merge only, and both `verify` and `e2e` must pass. A merge to `main` deploys to Render, so this is the gate in front of production.
 
 ### Testing
 - Run all unit tests: `pnpm run test`
