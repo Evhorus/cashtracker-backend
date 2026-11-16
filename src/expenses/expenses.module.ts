@@ -6,6 +6,8 @@ import { ExpensesRepository } from './repositories/expenses.repository';
 import { EnvelopesModule } from '../envelopes/envelopes.module';
 import { ExpensesController } from './expenses.controller';
 import { ExpensesService } from './expenses.service';
+import { ExpensesReportController } from './expenses-report.controller';
+import { ExpensesReportService } from './expenses-report.service';
 import { PaymentMethodsModule } from '../payment-methods/payment-methods.module';
 
 @Module({
@@ -14,8 +16,8 @@ import { PaymentMethodsModule } from '../payment-methods/payment-methods.module'
     EnvelopesModule, // Import EnvelopesModule to use its services/repositories
     PaymentMethodsModule,
   ],
-  controllers: [ExpensesController],
-  providers: [ExpensesService, ExpensesRepository],
+  controllers: [ExpensesController, ExpensesReportController],
+  providers: [ExpensesService, ExpensesReportService, ExpensesRepository],
   exports: [ExpensesService],
 })
 export class ExpensesModule {}

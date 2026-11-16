@@ -32,6 +32,7 @@ export const ERROR_MESSAGES = {
   AMOUNT_MUST_BE_POSITIVE: 'Amount must be greater than 0',
   INVALID_DATE_FORMAT: 'La fecha debe tener el formato YYYY-MM-DD',
   INVALID_DATE_RANGE: 'La fecha final no puede ser anterior a la inicial',
+  INVALID_MONTH_FORMAT: 'El mes debe tener el formato YYYY-MM',
   AMOUNT_TOO_LARGE: 'El monto supera el máximo permitido',
 
   // Auth errors

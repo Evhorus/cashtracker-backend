@@ -1,7 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository, SelectQueryBuilder } from 'typeorm';
+import {
+  Brackets,
+  EntityManager,
+  Repository,
+  SelectQueryBuilder,
+} from 'typeorm';
 import { Expense } from '../entities/expense.entity';
+import type { ReportScope } from '../utils/report-scopes';
+
+/** One row of a report total: a currency, and the payment method too
+ * when grouped by it (null = expenses without one). */
+export interface ReportTotalRow {
+  paymentMethodId: string | null;
+  currency: string;
+  total: number;
+  count: number;
+}
 
 interface ExpenseFilters {
   startDate?: string;
@@ -113,5 +128,94 @@ export class ExpensesRepository {
       .getRawOne<{ sum: string }>();
 
     return result && result.sum ? parseFloat(result.sum) : 0;
+  }
+
+  /**
+   * The user's expenses (across all their envelopes) that fall in any of
+   * the scopes: each scope is one payment method, or none, with its own
+   * date range. Callers must not pass an empty list - it would match
+   * every expense of the user.
+   */
+  private buildReportQuery(
+    userId: string,
+    scopes: ReportScope[],
+  ): SelectQueryBuilder<Expense> {
+    return this.repository
+      .createQueryBuilder('expense')
+      .innerJoin('expense.envelope', 'envelope')
+      .where('envelope.userId = :userId', { userId })
+      .andWhere(
+        new Brackets((anyScope) => {
+          scopes.forEach((scope, index) => {
+            const method =
+              scope.paymentMethodId === null
+                ? 'expense.paymentMethodId IS NULL'
+                : `expense.paymentMethodId = :method${index}`;
+            anyScope.orWhere(
+              `(${method} AND expense.date BETWEEN :start${index} AND :end${index})`,
+              {
+                [`method${index}`]: scope.paymentMethodId,
+                [`start${index}`]: scope.startDate,
+                [`end${index}`]: scope.endDate,
+              },
+            );
+          });
+        }),
+      );
+  }
+
+  /** Every matching expense, newest first, with its envelope and
+   * payment method - a report is read or exported whole, so it is not
+   * paginated; the period bounds it. */
+  findForReport(userId: string, scopes: ReportScope[]) {
+    return this.buildReportQuery(userId, scopes)
+      .addSelect(['envelope.id', 'envelope.name'])
+      .leftJoinAndSelect('expense.paymentMethod', 'paymentMethod')
+      .orderBy('expense.date', 'DESC')
+      .addOrderBy('expense.createdAt', 'DESC')
+      .getMany();
+  }
+
+  /** Sums per payment method and currency, computed by Postgres so no
+   * float addition touches money. */
+  async sumForReport(
+    userId: string,
+    scopes: ReportScope[],
+  ): Promise<ReportTotalRow[]> {
+    const rows = await this.buildReportQuery(userId, scopes)
+      .select('expense.paymentMethodId', 'paymentMethodId')
+      .addSelect('expense.currency', 'currency')
+      .addSelect('SUM(expense.amount)', 'total')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('expense.paymentMethodId')
+      .addGroupBy('expense.currency')
+      .getRawMany<{
+        paymentMethodId: string | null;
+        currency: string;
+        total: string;
+        count: string;
+      }>();
+
+    return rows.map((row) => ({
+      paymentMethodId: row.paymentMethodId,
+      currency: row.currency,
+      total: parseFloat(row.total),
+      count: Number(row.count),
+    }));
+  }
+
+  /** Grand total per currency over the same expenses. */
+  async sumForReportByCurrency(userId: string, scopes: ReportScope[]) {
+    const rows = await this.buildReportQuery(userId, scopes)
+      .select('expense.currency', 'currency')
+      .addSelect('SUM(expense.amount)', 'total')
+      .groupBy('expense.currency')
+      .orderBy('expense.currency', 'ASC')
+      .getRawMany<{ currency: string; total: string }>();
+
+    return rows.map((row) => ({
+      currency: row.currency,
+      total: parseFloat(row.total),
+    }));
   }
 }
