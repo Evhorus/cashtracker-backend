@@ -13,6 +13,7 @@ interface ExpenseFilters {
   endDate?: string;
   search?: string;
   sort?: 'ASC' | 'DESC';
+  sortBy?: 'date' | 'amount';
   paymentMethodIds?: string[];
   includeUnassigned?: boolean;
 }
@@ -120,7 +121,13 @@ export class ExpensesRepository {
     // I spend first), and what the frontend's own "Actividad reciente"
     // dashboard widget already assumes for expenses.
     const sortOrder = filters.sort || 'DESC';
-    query.orderBy('expense.date', sortOrder);
+    if (filters.sortBy === 'amount') {
+      // Ties (same amount) fall back to newest first.
+      query.orderBy('expense.amount', sortOrder);
+      query.addOrderBy('expense.date', 'DESC');
+    } else {
+      query.orderBy('expense.date', sortOrder);
+    }
     query.addOrderBy('expense.createdAt', 'DESC');
     query.skip((page - 1) * limit).take(limit);
 

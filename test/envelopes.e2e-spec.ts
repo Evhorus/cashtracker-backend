@@ -300,6 +300,40 @@ describe('Envelopes (e2e)', () => {
       }
     }
 
+    it('orders envelopes by the period they cover, newest first by default', async () => {
+      // Created in the opposite order to their periods, so creation
+      // order alone would give the wrong answer.
+      await createEnvelopeWithExpenses('septiembre', ['2026-09-10']);
+      await createEnvelopeWithExpenses('agosto', ['2026-08-10']);
+      await createEnvelopeWithExpenses('octubre', ['2026-10-10']);
+
+      const names = async (query: Record<string, string>) =>
+        (
+          await request(app.getHttpServer())
+            .get('/envelopes')
+            .query(query)
+            .expect(200)
+        ).body.data.map((envelope: { name: string }) => envelope.name);
+
+      expect(await names({})).toEqual(['octubre', 'septiembre', 'agosto']);
+      expect(await names({ sort: 'oldest' })).toEqual([
+        'agosto',
+        'septiembre',
+        'octubre',
+      ]);
+      // Paginates over that order.
+      expect(await names({ sort: 'oldest', limit: '2', page: '2' })).toEqual([
+        'octubre',
+      ]);
+    });
+
+    it('rejects an unknown order', async () => {
+      await request(app.getHttpServer())
+        .get('/envelopes')
+        .query({ sort: 'biggest' })
+        .expect(400);
+    });
+
     it("reports each envelope's first and last expense date", async () => {
       // Out of order on purpose: the range is MIN/MAX, not insert order.
       await createEnvelopeWithExpenses('tarjetas noviembre', [

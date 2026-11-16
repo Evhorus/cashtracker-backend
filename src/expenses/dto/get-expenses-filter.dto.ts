@@ -32,6 +32,11 @@ export class GetExpensesFilterDto extends PaginationQueryDto {
   @IsIn(['ASC', 'DESC'])
   sort?: 'ASC' | 'DESC';
 
+  /** What `sort` orders by: the expense date (default) or the amount. */
+  @IsOptional()
+  @IsIn(['date', 'amount'])
+  sortBy?: 'date' | 'amount';
+
   /** Only expenses paid with one of these. With `includeUnassigned`,
    * also those without a payment method. Neither set = all expenses. */
   @IsOptional()

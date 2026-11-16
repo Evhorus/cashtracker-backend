@@ -32,11 +32,12 @@ export class EnvelopesController {
   @Get()
   findAll(
     @CurrentUser('id') userId: string,
-    @Query() { page, limit, search, status }: GetEnvelopesFilterDto,
+    @Query() { page, limit, search, status, sort }: GetEnvelopesFilterDto,
   ) {
     return this.envelopesService.findAllLight(userId, page, limit, {
       search,
       status,
+      sort,
     });
   }
 

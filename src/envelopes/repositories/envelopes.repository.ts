@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { Envelope } from '../entities/envelope.entity';
 import { Expense } from '../../expenses/entities/expense.entity';
+import type { EnvelopeSort } from '../dto/get-envelopes-filter.dto';
 import {
   buildEnvelopeStatusPredicate,
   type EnvelopeStatusFilter,
@@ -12,6 +13,12 @@ import {
  * Custom repository for Envelope entity
  * Encapsulates complex queries and data access logic
  */
+export interface EnvelopeListFilters {
+  search?: string;
+  status?: EnvelopeStatusFilter;
+  sort?: EnvelopeSort;
+}
+
 @Injectable()
 export class EnvelopesRepository {
   constructor(
@@ -32,7 +39,7 @@ export class EnvelopesRepository {
     userId: string,
     page: number,
     limit: number,
-    filters: { search?: string; status?: EnvelopeStatusFilter } = {},
+    filters: EnvelopeListFilters = {},
   ) {
     const query = this.repository
       .createQueryBuilder('envelope')
@@ -75,8 +82,19 @@ export class EnvelopesRepository {
       }
     }
 
-    query.orderBy('envelope.createdAt', 'DESC');
-    query.skip((page - 1) * limit).take(limit);
+    // The period it covers: its latest expense, or its creation date
+    // while it has none - the date its card shows.
+    const direction = filters.sort === 'oldest' ? 'ASC' : 'DESC';
+    query.addSelect(
+      `COALESCE((SELECT MAX(expense.date) FROM expense WHERE expense."envelopeId" = envelope.id), envelope.created_at::date)`,
+      'period_end',
+    );
+    query.orderBy('period_end', direction);
+    query.addOrderBy('envelope.createdAt', direction);
+    // offset/limit rather than skip/take: the only join is many-to-one,
+    // so rows never multiply, and skip/take's two-query pagination
+    // cannot order by a computed column.
+    query.offset((page - 1) * limit).limit(limit);
 
     return query.getManyAndCount();
   }

@@ -266,6 +266,23 @@ describe('Payment methods (e2e)', () => {
       expect(names(onlyNone.body)).toEqual(['chatgpt']);
     });
 
+    it('orders by amount when asked, biggest first', async () => {
+      const { envelopeId } = await seed();
+
+      const biggest = await list(envelopeId, { sortBy: 'amount' });
+      expect(
+        biggest.body.data.map((row: { name: string }) => row.name),
+      ).toEqual(['exito', 'carulla', 'chatgpt']);
+
+      const smallest = await list(envelopeId, {
+        sortBy: 'amount',
+        sort: 'ASC',
+      });
+      expect(
+        smallest.body.data.map((row: { name: string }) => row.name),
+      ).toEqual(['chatgpt', 'carulla', 'exito']);
+    });
+
     it('lists everything when nothing is selected', async () => {
       const { envelopeId } = await seed();
 
