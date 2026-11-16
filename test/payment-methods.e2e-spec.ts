@@ -211,4 +211,76 @@ describe('Payment methods (e2e)', () => {
     );
     expect(parseFloat(envelope.spent)).toBe(100);
   });
+
+  describe('filtering an envelope by payment method', () => {
+    async function seed() {
+      const davivienda = await createMethod({ name: 'Davivienda' });
+      const davibank = await createMethod({ name: 'Davibank' });
+      const envelopeId = await createEnvelope();
+      const add = (name: string, amount: number, paymentMethodId?: string) =>
+        request(app.getHttpServer())
+          .post(`/envelopes/${envelopeId}/expenses`)
+          .send(expense({ name, amount, paymentMethodId }))
+          .expect(201);
+      await add('carulla', 100, davivienda);
+      await add('exito', 200, davibank);
+      await add('chatgpt', 50);
+      return { davivienda, davibank, envelopeId };
+    }
+
+    const list = (envelopeId: string, query: Record<string, string>) =>
+      request(app.getHttpServer())
+        .get(`/envelopes/${envelopeId}/expenses`)
+        .query(query)
+        .expect(200);
+
+    const names = (body: { data: { name: string }[] }) =>
+      body.data.map((row) => row.name).sort();
+
+    it('keeps only the selected method, and totals only those', async () => {
+      const { davivienda, envelopeId } = await seed();
+
+      const res = await list(envelopeId, { paymentMethodIds: davivienda });
+
+      expect(names(res.body)).toEqual(['carulla']);
+      expect(res.body.meta.total).toBe(1);
+      expect(Number(res.body.meta.totalAmount)).toBe(100);
+    });
+
+    it('takes several methods, and the ones without a method on request', async () => {
+      const { davivienda, davibank, envelopeId } = await seed();
+
+      const both = await list(envelopeId, {
+        paymentMethodIds: `${davivienda},${davibank}`,
+      });
+      expect(names(both.body)).toEqual(['carulla', 'exito']);
+
+      const withNone = await list(envelopeId, {
+        paymentMethodIds: davibank,
+        includeUnassigned: 'true',
+      });
+      expect(names(withNone.body)).toEqual(['chatgpt', 'exito']);
+      expect(Number(withNone.body.meta.totalAmount)).toBe(250);
+
+      const onlyNone = await list(envelopeId, { includeUnassigned: 'true' });
+      expect(names(onlyNone.body)).toEqual(['chatgpt']);
+    });
+
+    it('lists everything when nothing is selected', async () => {
+      const { envelopeId } = await seed();
+
+      const res = await list(envelopeId, {});
+
+      expect(names(res.body)).toEqual(['carulla', 'chatgpt', 'exito']);
+    });
+
+    it('rejects an id that is not a uuid', async () => {
+      const envelopeId = await createEnvelope();
+
+      await request(app.getHttpServer())
+        .get(`/envelopes/${envelopeId}/expenses`)
+        .query({ paymentMethodIds: 'nope' })
+        .expect(400);
+    });
+  });
 });

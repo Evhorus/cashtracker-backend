@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository, SelectQueryBuilder } from 'typeorm';
+import {
+  Brackets,
+  EntityManager,
+  Repository,
+  SelectQueryBuilder,
+} from 'typeorm';
 import { Expense } from '../entities/expense.entity';
 
 interface ExpenseFilters {
@@ -8,6 +13,8 @@ interface ExpenseFilters {
   endDate?: string;
   search?: string;
   sort?: 'ASC' | 'DESC';
+  paymentMethodIds?: string[];
+  includeUnassigned?: boolean;
 }
 
 @Injectable()
@@ -72,6 +79,25 @@ export class ExpensesRepository {
       query.andWhere(
         '(LOWER(expense.name) LIKE LOWER(:search) OR LOWER(expense.description) LIKE LOWER(:search))',
         { search: `%${filters.search}%` },
+      );
+    }
+
+    const methodIds = filters.paymentMethodIds ?? [];
+    if (methodIds.length > 0 || filters.includeUnassigned) {
+      // Any of the selected methods, or none at all when asked - an OR
+      // inside its own brackets so it cannot leak past the envelope
+      // condition above.
+      query.andWhere(
+        new Brackets((byMethod) => {
+          if (methodIds.length > 0) {
+            byMethod.orWhere('expense.paymentMethodId IN (:...methodIds)', {
+              methodIds,
+            });
+          }
+          if (filters.includeUnassigned) {
+            byMethod.orWhere('expense.paymentMethodId IS NULL');
+          }
+        }),
       );
     }
 
