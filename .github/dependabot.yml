@@ -23,6 +23,12 @@ updates:
         update-types: ["minor", "patch"]
     # Majors stay ungrouped and open for review: each one (NestJS,
     # TypeORM, TypeScript, ESLint) is a migration of its own.
+    ignore:
+      # @types/node must match the Node major the app runs on (22, see
+      # engines/Dockerfile/CI), not the latest Node. A newer major types
+      # APIs that do not exist at runtime. Bump it with the runtime.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 5
     commit-message:
       # Conventional Commits; squash-merging takes the PR title.
