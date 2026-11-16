@@ -19,7 +19,7 @@ export class ExpensesRepository {
 
   async findById(id: string, manager?: EntityManager) {
     const repo = manager ? manager.getRepository(Expense) : this.repository;
-    return repo.findOneBy({ id });
+    return repo.findOne({ where: { id }, relations: { paymentMethod: true } });
   }
 
   async create(expenseData: Partial<Expense>, manager?: EntityManager) {
@@ -84,7 +84,10 @@ export class ExpensesRepository {
     page: number,
     limit: number,
   ) {
-    const query = this.buildFilteredQuery(envelopeId, filters);
+    const query = this.buildFilteredQuery(
+      envelopeId,
+      filters,
+    ).leftJoinAndSelect('expense.paymentMethod', 'paymentMethod');
 
     // Most recent first by default - the conventional order for a
     // transaction/expense history (what did I just spend, not what did

@@ -97,7 +97,7 @@ export class EnvelopesRepository {
   async findByIdWithExpenses(id: string) {
     return this.repository.findOne({
       where: { id },
-      relations: { expenses: true, category: true },
+      relations: { expenses: { paymentMethod: true }, category: true },
     });
   }
 
