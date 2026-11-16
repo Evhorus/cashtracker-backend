@@ -5,7 +5,6 @@ import { AppModule } from '../src/app.module';
 import { assertSafeTestDatabase } from './assert-safe-test-database';
 import { DataSource } from 'typeorm';
 import { ClerkAuthGuard } from '../src/auth/guards/clerk-auth.guard';
-import { ThrottlerGuard } from '@nestjs/throttler';
 
 describe('Envelopes (e2e)', () => {
   let app: INestApplication;
@@ -31,8 +30,6 @@ describe('Envelopes (e2e)', () => {
           return true;
         },
       })
-      .overrideGuard(ThrottlerGuard)
-      .useValue({ canActivate: () => true })
       .compile();
 
     app = moduleFixture.createNestApplication();

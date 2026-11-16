@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerModule } from '@nestjs/throttler';
 import { AppConfigModule } from './config/app-config.module';
 
 import { EnvelopesModule } from './envelopes/envelopes.module';
@@ -16,12 +15,6 @@ import { CategoriesModule } from './categories/categories.module';
   imports: [
     AppConfigModule,
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000, // 60 seconds
-        limit: 60, // 60 requests per minute
-      },
-    ]),
     DatabaseModule,
     EnvelopesModule,
     ExpensesModule,
