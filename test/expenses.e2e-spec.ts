@@ -359,4 +359,82 @@ describe('Expenses (e2e)', () => {
       expect(await spentOf(envelopeId)).toBe(150);
     });
   });
+
+  describe('input validation', () => {
+    async function createEnvelope() {
+      await request(app.getHttpServer())
+        .post('/envelopes')
+        .send({ name: 'Validation', amount: 1000, currency: 'COP' })
+        .expect(201);
+      const [{ id }] = await dataSource.query(
+        'SELECT id FROM envelope ORDER BY created_at DESC LIMIT 1',
+      );
+      return id as string;
+    }
+
+    const expense = (overrides: Record<string, unknown>) => ({
+      name: 'Item',
+      amount: 100,
+      currency: 'COP',
+      date: '2026-11-16',
+      ...overrides,
+    });
+
+    it('answers an amount past the column ceiling with 400, not 500', async () => {
+      const envelopeId = await createEnvelope();
+
+      const res = await request(app.getHttpServer())
+        .post(`/envelopes/${envelopeId}/expenses`)
+        .send(expense({ amount: 10_000_000_000 }))
+        .expect(400);
+
+      expect(JSON.stringify(res.body)).toMatch(/supera el máximo/);
+    });
+
+    it('accepts an amount exactly at the ceiling', async () => {
+      const envelopeId = await createEnvelope();
+
+      await request(app.getHttpServer())
+        .post(`/envelopes/${envelopeId}/expenses`)
+        .send(expense({ amount: 9_999_999_999.99 }))
+        .expect(201);
+    });
+
+    it.each([
+      ['a full timestamp', '2026-11-16T23:30:00-05:00'],
+      ['an impossible day', '2026-02-30'],
+    ])('rejects %s as an expense date', async (_label, date) => {
+      const envelopeId = await createEnvelope();
+
+      await request(app.getHttpServer())
+        .post(`/envelopes/${envelopeId}/expenses`)
+        .send(expense({ date }))
+        .expect(400);
+    });
+
+    it('rejects a date range that ends before it starts', async () => {
+      const envelopeId = await createEnvelope();
+
+      await request(app.getHttpServer())
+        .get(`/envelopes/${envelopeId}/expenses`)
+        .query({ startDate: '2026-11-16', endDate: '2026-11-01' })
+        .expect(400);
+    });
+
+    it('accepts a one-day range', async () => {
+      const envelopeId = await createEnvelope();
+
+      await request(app.getHttpServer())
+        .get(`/envelopes/${envelopeId}/expenses`)
+        .query({ startDate: '2026-11-16', endDate: '2026-11-16' })
+        .expect(200);
+    });
+
+    it('rejects an envelope limit past the ceiling', async () => {
+      await request(app.getHttpServer())
+        .post('/envelopes')
+        .send({ name: 'Huge', amount: 10_000_000_000, currency: 'COP' })
+        .expect(400);
+    });
+  });
 });

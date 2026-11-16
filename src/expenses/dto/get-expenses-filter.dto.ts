@@ -1,13 +1,18 @@
-import { IsOptional, IsString, IsDateString, IsIn } from 'class-validator';
+import { IsOptional, IsString, IsIn } from 'class-validator';
+import {
+  IsCalendarDate,
+  IsNotBefore,
+} from 'src/common/validators/calendar-date.validators';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 
 export class GetExpensesFilterDto extends PaginationQueryDto {
   @IsOptional()
-  @IsDateString()
+  @IsCalendarDate()
   startDate?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsCalendarDate()
+  @IsNotBefore('startDate')
   endDate?: string;
 
   @IsOptional()

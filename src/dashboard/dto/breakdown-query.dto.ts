@@ -1,13 +1,10 @@
 import { Type } from 'class-transformer';
-import {
-  IsDateString,
-  IsEnum,
-  IsInt,
-  IsOptional,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
 import { Currency } from 'src/common/enums/currency.enum';
+import {
+  IsCalendarDate,
+  IsNotBefore,
+} from 'src/common/validators/calendar-date.validators';
 
 /**
  * Shared filter shape for the four "breakdown" endpoints (category,
@@ -43,10 +40,11 @@ export class BreakdownQueryDto {
   year?: number;
 
   @IsOptional()
-  @IsDateString()
+  @IsCalendarDate()
   startDate?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsCalendarDate()
+  @IsNotBefore('startDate')
   endDate?: string;
 }
