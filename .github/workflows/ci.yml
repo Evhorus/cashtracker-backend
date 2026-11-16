@@ -1,0 +1,103 @@
+name: CI
+
+# Pull requests and anything that lands on main. Both jobs are required
+# checks on main (see the "protect main" ruleset), so nothing reaches the
+# Render deploy without passing them.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push to the same PR makes the previous run's answer irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      # Before setup-node, which needs pnpm on PATH to resolve its cache.
+      # Same pnpm major the lockfile and pnpm-workspace.yaml are written for.
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.20.0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # --frozen-lockfile: fail on a lockfile that disagrees with
+      # package.json rather than quietly resolving something else.
+      - run: pnpm install --frozen-lockfile
+
+      # Check-only variants: `pnpm lint` and `pnpm format` rewrite files.
+      - run: pnpm typecheck
+      - run: pnpm lint:check
+      - run: pnpm format:check
+      # Unit tests mock the repositories, so they need no database.
+      - run: pnpm test
+      - run: pnpm build
+
+  # The e2e suites exercise the money paths (expenses moving an
+  # envelope's spent, dashboard aggregates) against a real Postgres.
+  # The database is a throwaway service container, never Neon, and no
+  # secret is needed: the suites override ClerkAuthGuard, so the Clerk key
+  # below is a placeholder that only satisfies env validation. That also
+  # means Dependabot PRs can run this job.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        # trust auth: the container lives only for this job and listens on
+        # the runner, so there is no password to set (or to be mistaken
+        # for a leaked credential by secret scanners).
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: cashtracker_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.20.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # NODE_ENV=test makes the app and data-source.ts read .env.test.
+      # There is no .env here, so assert-safe-test-database.ts only warns
+      # that it cannot compare against an everyday database - expected.
+      # Migrations run on boot and give the empty database its schema.
+      - name: Write .env.test for the throwaway database
+        run: |
+          cat > .env.test <<'EOF'
+          NODE_ENV=test
+          CLIENT_URL=http://localhost:4001
+          API_URL=http://localhost:4000/api
+          DATABASE_URL=postgresql://postgres@localhost:5432/cashtracker_test
+          CLERK_SECRET_KEY=sk_test_ci_placeholder
+          EOF
+
+      - run: pnpm test:e2e
