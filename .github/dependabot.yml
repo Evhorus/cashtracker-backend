@@ -1,0 +1,53 @@
+# yaml-language-server: $schema=https://json.schemastore.org/dependabot-2.0.json
+#
+# Same setup as cashtracker-frontend. Worth doing because every PR runs
+# the required `verify` and `e2e` checks: a bump either passes the same
+# gates a human change does, or it does not. Neither job needs a secret,
+# so unlike the frontend both really run on Dependabot PRs.
+version: 2
+
+updates:
+  # Reads pnpm-lock.yaml - the "npm" ecosystem covers pnpm.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: America/Bogota
+    groups:
+      # One PR for everything low-risk; dependabot-auto-merge.yml merges
+      # it once the required checks pass.
+      patch-and-minor:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    # Majors stay ungrouped and open for review: each one (NestJS,
+    # TypeORM, TypeScript, ESLint) is a migration of its own.
+    open-pull-requests-limit: 5
+    commit-message:
+      # Conventional Commits; squash-merging takes the PR title.
+      prefix: chore
+      prefix-development: chore
+      include: scope
+    labels: ["dependencies"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: America/Bogota
+    groups:
+      actions:
+        patterns: ["*"]
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: ci
+      include: scope
+    labels: ["dependencies", "github-actions"]
+
+  # The Dockerfile is not listed on purpose: its base image is
+  # `node:${NODE_VERSION}-alpine`, and Dependabot cannot resolve a tag
+  # built from an ARG, so it would never propose anything. Bump
+  # NODE_VERSION by hand.

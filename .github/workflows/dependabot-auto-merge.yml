@@ -1,0 +1,53 @@
+name: Dependabot auto-merge
+
+# Minor and patch bumps merge themselves once `verify` and `e2e` are
+# green; majors wait for a human. Merging deploys to Render, so this is
+# the same trust as merging by hand on a green CI. The decision on a
+# grouped minor/patch PR was always
+# "is CI green? then merge" - this is that decision written down instead
+# of clicked once a week.
+#
+# Nothing is bypassed: auto-merge queues the PR behind the same branch
+# protection a human PR goes through (`verify`, `e2e`, up-to-date branch,
+# linear history). A red check means the PR just sits there open.
+on: pull_request
+
+# Read-only is the default for workflows Dependabot triggers, and no
+# repository secret is readable from one. This block lifts GITHUB_TOKEN
+# to write for this workflow only - which is why the job is gated on the
+# author below and does nothing but read metadata and enable auto-merge.
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    # The PR author, not `github.actor`: the actor changes on a rerun.
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+
+    steps:
+      # The commit message is the only place the semver jump is recorded,
+      # and parsing it by hand is how you end up merging a major. This
+      # action reads Dependabot's own metadata off the PR instead.
+      - id: metadata
+        uses: dependabot/fetch-metadata@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # On a grouped PR, `update-type` is the highest jump in the group,
+      # so one major in the actions group holds the whole PR back. The
+      # npm group is already restricted to minor and patch in
+      # dependabot.yml; this is what covers the github-actions group,
+      # which is not.
+      - if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        run: gh pr merge --squash --auto "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Majors are left open on purpose - a major is a migration with
+      # codemods and a changelog to read, and `verify` passing is not
+      # the same thing as it being a good idea.
+      - if: steps.metadata.outputs.update-type == 'version-update:semver-major'
+        run: echo "::notice::Major update - left open for review."
