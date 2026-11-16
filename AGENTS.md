@@ -91,7 +91,7 @@ envelopes and expenses) so it's a lighter version of this shape.
 - **Testing**: Jest 30 and Supertest 7 (Unit and end-to-end testing).
 - **Scheduling**: `@nestjs/schedule` (`@Cron`) drives the health-check keep-alive ping.
 - **Rate Limiting**: `@nestjs/throttler`, configured globally (60 requests/60s) in `AppModule`.
-- **Outbound HTTP**: `@nestjs/axios` (wraps `axios`), used by the health-check self-ping.
+- **Outbound HTTP**: Node's built-in `fetch` (no HTTP client dependency), used only by the health-check self-ping.
 - **Security Headers**: `helmet`, applied globally in `main.ts`.
 
 ### Key Patterns

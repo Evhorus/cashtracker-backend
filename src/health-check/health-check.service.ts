@@ -1,37 +1,34 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
-import { HttpService } from '@nestjs/axios';
-// import { DataSource } from 'typeorm';
-import { firstValueFrom } from 'rxjs';
+
+const KEEP_ALIVE_TIMEOUT_MS = 5000;
 
 @Injectable()
 export class HealthCheckService {
   private readonly logger = new Logger(HealthCheckService.name);
 
-  constructor(
-    // private readonly dataSource: DataSource,
-    private readonly httpService: HttpService,
-    private readonly configService: ConfigService,
-  ) {}
+  constructor(private readonly configService: ConfigService) {}
 
   /**
-   * Keep-alive ping to prevent Render from hibernating the server
-   * Runs every 5 minutes (Render free tier suspends after ~15 minutes of inactivity)
-   * Strategy: DB ping + Self HTTP request to simulate inbound traffic
+   * Keep-alive ping to prevent Render from hibernating the server.
+   * Runs every 5 minutes (Render free tier suspends after ~15 minutes of
+   * inactivity) and requests the app's own public URL so it registers as
+   * inbound traffic. Uses Node's built-in fetch, so no HTTP client
+   * dependency is needed for this one call.
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async keepAlive() {
+    const url = `${this.configService.getOrThrow<string>('API_URL')}/health-check`;
+
     try {
-      // 1. Database ping - keeps DB connection alive
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(KEEP_ALIVE_TIMEOUT_MS),
+      });
 
-      // await this.dataSource.query('SELECT 1');
-      // this.logger.log('✓ Database ping successful');
-
-      // 2. Self HTTP ping - attempt to register as inbound traffic for Render
-      const url = `${this.configService.getOrThrow<string>('API_URL')}/health-check`;
-
-      await firstValueFrom(this.httpService.get(url, { timeout: 5000 }));
+      if (!response.ok) {
+        throw new Error(`Unexpected status ${response.status}`);
+      }
 
       this.logger.log('✓ Self HTTP ping successful');
     } catch (error: unknown) {

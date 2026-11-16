@@ -234,7 +234,7 @@ y pide una confirmación extra (`SI`) si el destino es el host de producción de
 - **Validación:** class-validator, class-transformer, Zod
 - **Testing:** Jest, Supertest
 - **Seguridad y confiabilidad:** Helmet (cabeceras HTTP), `@nestjs/throttler`
-  (rate limiting global) y `@nestjs/schedule` + `@nestjs/axios` (ping
+  (rate limiting global) y `@nestjs/schedule` + `fetch` nativo de Node (ping
   periódico de keep-alive para evitar la hibernación en free tiers)
 
 ## Características
