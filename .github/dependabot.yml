@@ -16,13 +16,26 @@ updates:
       time: "08:00"
       timezone: America/Bogota
     groups:
+      # NestJS packages only work on matching majors: a lone
+      # @nestjs/passport 12 next to @nestjs/core 11 fails e2e (#23, #24).
+      # Majors of the whole framework arrive as one PR, to be migrated
+      # together. Listed first so it wins over the catch-all below.
+      nestjs-major:
+        patterns: ["@nestjs/*"]
+        update-types: ["major"]
       # One PR for everything low-risk; dependabot-auto-merge.yml merges
       # it once the required checks pass.
       patch-and-minor:
         patterns: ["*"]
         update-types: ["minor", "patch"]
-    # Majors stay ungrouped and open for review: each one (NestJS,
-    # TypeORM, TypeScript, ESLint) is a migration of its own.
+    # Other majors stay ungrouped and open for review: each one (TypeORM,
+    # TypeScript, ESLint) is a migration of its own.
+    ignore:
+      # @types/node must match the Node major the app runs on (22, see
+      # engines/Dockerfile/CI), not the latest Node. A newer major types
+      # APIs that do not exist at runtime. Bump it with the runtime.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 5
     commit-message:
       # Conventional Commits; squash-merging takes the PR title.
