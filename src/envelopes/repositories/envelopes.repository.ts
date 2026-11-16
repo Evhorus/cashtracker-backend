@@ -82,6 +82,29 @@ export class EnvelopesRepository {
   }
 
   /**
+   * First and last expense date of each envelope, in one grouped query
+   * for a whole page of the list. `::text` keeps them `YYYY-MM-DD`: the
+   * pg driver would otherwise turn a raw `date` into a JS Date at local
+   * midnight. Envelopes without expenses are simply absent.
+   */
+  async findExpenseDateRanges(
+    envelopeIds: string[],
+  ): Promise<Map<string, { first: string; last: string }>> {
+    if (envelopeIds.length === 0) return new Map();
+    const rows = await this.repository.manager
+      .createQueryBuilder(Expense, 'expense')
+      .select('expense.envelopeId', 'envelopeId')
+      .addSelect('MIN(expense.date)::text', 'first')
+      .addSelect('MAX(expense.date)::text', 'last')
+      .where('expense.envelopeId IN (:...envelopeIds)', { envelopeIds })
+      .groupBy('expense.envelopeId')
+      .getRawMany<{ envelopeId: string; first: string; last: string }>();
+    return new Map(
+      rows.map((row) => [row.envelopeId, { first: row.first, last: row.last }]),
+    );
+  }
+
+  /**
    * Find one envelope by ID
    */
   async findById(id: string) {

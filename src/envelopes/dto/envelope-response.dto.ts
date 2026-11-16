@@ -25,6 +25,11 @@ export class EnvelopeResponseDto {
    * EnvelopeCategoryDto. */
   category: EnvelopeCategoryDto | null;
   description?: string;
+  /** Date of its earliest and latest expense (`YYYY-MM-DD`), or null
+   * without expenses - the period the envelope actually covers, which
+   * its name or creation date may not say. */
+  firstExpenseDate: string | null;
+  lastExpenseDate: string | null;
   createdAt: Date;
   updatedAt: Date;
 
@@ -33,7 +38,10 @@ export class EnvelopeResponseDto {
    * @param envelope Envelope entity from database
    * @returns EnvelopeResponseDto for API response
    */
-  static fromEntity(envelope: Envelope): EnvelopeResponseDto {
+  static fromEntity(
+    envelope: Envelope,
+    expenseDates?: { first: string; last: string },
+  ): EnvelopeResponseDto {
     return {
       id: envelope.id,
       name: envelope.name,
@@ -43,17 +51,10 @@ export class EnvelopeResponseDto {
       status: deriveEnvelopeStatus(envelope.amount, envelope.spent),
       category: EnvelopeCategoryDto.fromEntity(envelope.category),
       description: envelope.description,
+      firstExpenseDate: expenseDates?.first ?? null,
+      lastExpenseDate: expenseDates?.last ?? null,
       createdAt: envelope.createdAt,
       updatedAt: envelope.updatedAt,
     };
-  }
-
-  /**
-   * Transform array of Envelope entities to response DTOs
-   * @param envelopes Array of Envelope entities
-   * @returns Array of EnvelopeResponseDto
-   */
-  static fromEntities(envelopes: Envelope[]): EnvelopeResponseDto[] {
-    return envelopes.map((envelope) => this.fromEntity(envelope));
   }
 }

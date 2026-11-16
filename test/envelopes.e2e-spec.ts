@@ -282,6 +282,54 @@ describe('Envelopes (e2e)', () => {
     });
   });
 
+  describe('/envelopes (GET) expense date range', () => {
+    async function createEnvelopeWithExpenses(name: string, dates: string[]) {
+      await request(app.getHttpServer())
+        .post('/envelopes')
+        .send({ name, amount: 1000, currency: 'COP' })
+        .expect(201);
+      const [{ id }] = await dataSource.query(
+        'SELECT id FROM envelope WHERE name = $1',
+        [name],
+      );
+      for (const date of dates) {
+        await request(app.getHttpServer())
+          .post(`/envelopes/${id}/expenses`)
+          .send({ name: 'gasto', amount: 10, currency: 'COP', date })
+          .expect(201);
+      }
+    }
+
+    it("reports each envelope's first and last expense date", async () => {
+      // Out of order on purpose: the range is MIN/MAX, not insert order.
+      await createEnvelopeWithExpenses('tarjetas noviembre', [
+        '2026-11-08',
+        '2026-10-09',
+        '2026-10-30',
+      ]);
+      await createEnvelopeWithExpenses('vacio', []);
+
+      const res = await request(app.getHttpServer())
+        .get('/envelopes')
+        .expect(200);
+
+      const byName = Object.fromEntries(
+        res.body.data.map((envelope: { name: string }) => [
+          envelope.name,
+          envelope,
+        ]),
+      );
+      expect(byName['tarjetas noviembre']).toMatchObject({
+        firstExpenseDate: '2026-10-09',
+        lastExpenseDate: '2026-11-08',
+      });
+      expect(byName['vacio']).toMatchObject({
+        firstExpenseDate: null,
+        lastExpenseDate: null,
+      });
+    });
+  });
+
   describe('/envelopes/:envelopeId (GET)', () => {
     it('should return envelope with expenses', async () => {
       // Create envelope via API

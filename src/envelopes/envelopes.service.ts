@@ -77,8 +77,14 @@ export class EnvelopesService {
       filters,
     );
 
+    const expenseDates = await this.envelopesRepository.findExpenseDateRanges(
+      envelopes.map((envelope) => envelope.id),
+    );
+
     return new PaginatedResponseDto(
-      EnvelopeResponseDto.fromEntities(envelopes),
+      envelopes.map((envelope) =>
+        EnvelopeResponseDto.fromEntity(envelope, expenseDates.get(envelope.id)),
+      ),
       total,
       page,
       limit,
