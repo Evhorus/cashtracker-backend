@@ -254,4 +254,112 @@ describe('Expenses (e2e)', () => {
       expect(parseFloat(envelope[0].spent)).toBe(0);
     });
   });
+
+  describe('money integrity', () => {
+    const today = () => new Date().toISOString().split('T')[0];
+
+    async function createEnvelope(currency = 'COP') {
+      await request(app.getHttpServer())
+        .post('/envelopes')
+        .send({ name: `Integrity ${currency}`, amount: 1000, currency })
+        .expect(201);
+      const [{ id }] = await dataSource.query(
+        'SELECT id FROM envelope ORDER BY created_at DESC LIMIT 1',
+      );
+      return id as string;
+    }
+
+    async function createExpense(envelopeId: string, amount: number) {
+      await request(app.getHttpServer())
+        .post(`/envelopes/${envelopeId}/expenses`)
+        .send({ name: 'Item', amount, currency: 'COP', date: today() })
+        .expect(201);
+      const [{ id }] = await dataSource.query(
+        'SELECT id FROM expense ORDER BY created_at DESC LIMIT 1',
+      );
+      return id as string;
+    }
+
+    async function spentOf(envelopeId: string) {
+      const [row] = await dataSource.query(
+        'SELECT spent FROM envelope WHERE id = $1',
+        [envelopeId],
+      );
+      return parseFloat(row.spent);
+    }
+
+    it('rejects an expense in a different currency than its envelope', async () => {
+      const envelopeId = await createEnvelope('COP');
+
+      await request(app.getHttpServer())
+        .post(`/envelopes/${envelopeId}/expenses`)
+        .send({ name: 'Dollars', amount: 20, currency: 'USD', date: today() })
+        .expect(400);
+
+      expect(await spentOf(envelopeId)).toBe(0);
+    });
+
+    it('rejects changing an expense to another currency', async () => {
+      const envelopeId = await createEnvelope('COP');
+      const expenseId = await createExpense(envelopeId, 100);
+
+      await request(app.getHttpServer())
+        .patch(`/envelopes/${envelopeId}/expenses/${expenseId}`)
+        .send({ currency: 'USD' })
+        .expect(400);
+
+      const [row] = await dataSource.query(
+        'SELECT currency FROM expense WHERE id = $1',
+        [expenseId],
+      );
+      expect(row.currency).toBe('COP');
+    });
+
+    it('subtracts an expense once when it is deleted twice at the same time', async () => {
+      // A double tap or a retry: both requests pass the guard before
+      // either commits. Only one may take the amount off `spent`.
+      const envelopeId = await createEnvelope();
+      await createExpense(envelopeId, 300);
+      const expenseId = await createExpense(envelopeId, 200);
+
+      const responses = await Promise.all(
+        [1, 2].map(() =>
+          request(app.getHttpServer()).delete(
+            `/envelopes/${envelopeId}/expenses/${expenseId}`,
+          ),
+        ),
+      );
+
+      expect(responses.map((r) => r.status).sort()).toEqual([200, 404]);
+      expect(await spentOf(envelopeId)).toBe(300);
+    });
+
+    it('keeps spent equal to the sum when one expense is edited twice at the same time', async () => {
+      const envelopeId = await createEnvelope();
+      const expenseId = await createExpense(envelopeId, 100);
+
+      await Promise.all(
+        [150, 150].map((amount) =>
+          request(app.getHttpServer())
+            .patch(`/envelopes/${envelopeId}/expenses/${expenseId}`)
+            .send({ amount })
+            .expect(200),
+        ),
+      );
+
+      expect(await spentOf(envelopeId)).toBe(150);
+    });
+
+    it('repairs a spent that had drifted on the next write', async () => {
+      const envelopeId = await createEnvelope();
+      await createExpense(envelopeId, 100);
+      await dataSource.query('UPDATE envelope SET spent = 999 WHERE id = $1', [
+        envelopeId,
+      ]);
+
+      await createExpense(envelopeId, 50);
+
+      expect(await spentOf(envelopeId)).toBe(150);
+    });
+  });
 });

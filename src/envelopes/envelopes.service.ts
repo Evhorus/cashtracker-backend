@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
 import { PaginatedResponseDto } from 'src/common/dto/paginated-response.dto';
 import { EnvelopeResponseDto } from './dto/envelope-response.dto';
@@ -6,6 +10,7 @@ import { EnvelopeWithExpensesResponseDto } from './dto/envelope-with-expenses-re
 import { CreateEnvelopeDto } from './dto/create-envelope.dto';
 import { UpdateEnvelopeDto } from './dto/update-envelope.dto';
 import { EnvelopesRepository } from './repositories/envelopes.repository';
+import { Envelope } from './entities/envelope.entity';
 import { CategoriesRepository } from '../categories/repositories/categories.repository';
 import { type EnvelopeStatusFilter } from './utils/envelope-status';
 
@@ -100,12 +105,27 @@ export class EnvelopesService {
     return EnvelopeWithExpensesResponseDto.fromEntity(envelope);
   }
 
+  /**
+   * `spent` is a sum of expenses in the envelope's currency, so once it
+   * has expenses the currency is fixed: relabelling COP 100.000 as USD
+   * 100.000 would be silently wrong. Re-sending the same currency (the
+   * edit form always sends it) is not a change.
+   */
+  private async assertCurrencyCanChange(envelope: Envelope, currency?: string) {
+    if (currency === undefined || currency === envelope.currency) return;
+
+    if (await this.envelopesRepository.hasExpenses(envelope.id)) {
+      throw new ConflictException(ERROR_MESSAGES.ENVELOPE_CURRENCY_LOCKED);
+    }
+  }
+
   async update(id: string, updateEnvelopeDto: UpdateEnvelopeDto) {
     const envelope = await this.findOne(id);
     await this.assertCategoryIsUsable(
       envelope.userId,
       updateEnvelopeDto.categoryId,
     );
+    await this.assertCurrencyCanChange(envelope, updateEnvelopeDto.currency);
     await this.envelopesRepository.update(id, updateEnvelopeDto);
     return {
       message: 'Sobre actualizado',
