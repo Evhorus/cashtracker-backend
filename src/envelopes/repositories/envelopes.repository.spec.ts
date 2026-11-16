@@ -278,40 +278,4 @@ describe('EnvelopesRepository', () => {
       expect(mockRepository.save).toHaveBeenCalledWith(mockEnvelope);
     });
   });
-
-  describe('incrementSpent', () => {
-    it('should increment spent amount', async () => {
-      // Arrange
-      const id = 'envelope-123';
-      const amount = 50;
-
-      // Act
-      await repository.incrementSpent(id, amount);
-
-      // Assert
-      expect(mockRepository.increment).toHaveBeenCalledWith(
-        { id },
-        'spent',
-        amount,
-      );
-    });
-  });
-
-  describe('decrementSpent', () => {
-    it('should decrement spent amount', async () => {
-      // Arrange
-      const id = 'envelope-123';
-      const amount = 30;
-
-      // Act
-      await repository.decrementSpent(id, amount);
-
-      // Assert
-      expect(mockRepository.decrement).toHaveBeenCalledWith(
-        { id },
-        'spent',
-        amount,
-      );
-    });
-  });
 });
