@@ -207,7 +207,9 @@ export class DashboardRepository {
    * touches casing - "Mercaldas" and "MERCALDAS" are both valid stored
    * values for the same merchant (typing habits, bulk imports from a
    * bank export, ...). Grouping on `LOWER(expense.name)` instead of the
-   * raw column keeps those from splitting into separate rows here.
+   * raw column keeps those from splitting into separate rows here; the
+   * row shows the most recent spelling, so it reads the way the user
+   * writes it now.
    */
   async getNameBreakdown(
     userId: string,
@@ -219,7 +221,10 @@ export class DashboardRepository {
       currency,
       filters,
     )
-      .select('LOWER(expense.name)', 'name')
+      .select(
+        '(ARRAY_AGG(expense.name ORDER BY expense.date DESC, expense.createdAt DESC))[1]',
+        'name',
+      )
       .addSelect('COALESCE(SUM(expense.amount), 0)', 'spent')
       .addSelect('COUNT(*)', 'expenseCount')
       .groupBy('LOWER(expense.name)')

@@ -9,7 +9,7 @@ import {
   IsUUID,
   Max,
 } from 'class-validator';
-import { normalizeName, normalizeString } from 'src/common/utils/string-utils';
+import { normalizeString } from 'src/common/utils/string-utils';
 import { Currency } from 'src/common/enums/currency.enum';
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
 import { MAX_AMOUNT } from 'src/common/constants/amounts';
@@ -17,7 +17,7 @@ import { MAX_AMOUNT } from 'src/common/constants/amounts';
 export class CreateEnvelopeDto {
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => normalizeName(value))
+  @Transform(({ value }) => normalizeString(value))
   name: string;
 
   @IsEnum(Currency)

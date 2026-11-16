@@ -1,31 +1,23 @@
-import { normalizeName, normalizeString } from './string-utils';
+import { normalizeString } from './string-utils';
 
 describe('normalizeString', () => {
-  it('trims and collapses internal whitespace', () => {
+  it('trims and collapses repeated spaces', () => {
     expect(normalizeString('  Mercaldas   Store  ')).toBe('Mercaldas Store');
   });
 
-  it('leaves casing untouched', () => {
+  it('keeps the casing the user typed', () => {
     expect(normalizeString('MERCALDAS')).toBe('MERCALDAS');
+    expect(normalizeString('Wee hoo')).toBe('Wee hoo');
+  });
+
+  it('keeps line breaks, trimming the spaces around them', () => {
+    expect(normalizeString('Compra semanal:  \n  verduras\t y carnes\n')).toBe(
+      'Compra semanal:\nverduras y carnes',
+    );
   });
 
   it('passes non-strings through unchanged', () => {
     expect(normalizeString(undefined)).toBeUndefined();
     expect(normalizeString(42)).toBe(42);
-  });
-});
-
-describe('normalizeName', () => {
-  it('trims, collapses whitespace, and lowercases', () => {
-    expect(normalizeName('  MERCALDAS   Store  ')).toBe('mercaldas store');
-  });
-
-  it('folds different castings of the same name to the same value', () => {
-    expect(normalizeName('Mercaldas')).toBe(normalizeName('MERCALDAS'));
-  });
-
-  it('passes non-strings through unchanged', () => {
-    expect(normalizeName(undefined)).toBeUndefined();
-    expect(normalizeName(42)).toBe(42);
   });
 });

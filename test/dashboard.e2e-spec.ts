@@ -386,7 +386,7 @@ describe('Dashboard name breakdown (e2e)', () => {
     return res.body as NameBreakdownRow[];
   }
 
-  it('folds names that differ only by case into one row', async () => {
+  it('folds names that differ only by case into one row, showing the latest spelling', async () => {
     await request(app.getHttpServer())
       .post('/envelopes')
       .send({ name: 'Supermercado', amount: 1_000_000, currency: 'COP' })
@@ -398,7 +398,7 @@ describe('Dashboard name breakdown (e2e)', () => {
       .expect(200);
     const envelope = (
       list.body as { data: { id: string; name: string }[] }
-    ).data.find((e) => e.name === 'supermercado'); // normalized to lowercase on save
+    ).data.find((e) => e.name === 'Supermercado');
     if (!envelope) throw new Error('seed envelope not created');
 
     await request(app.getHttpServer())
@@ -423,8 +423,9 @@ describe('Dashboard name breakdown (e2e)', () => {
     const rows = await nameBreakdown({ currency: 'COP' });
 
     expect(rows).toHaveLength(1);
+    // "MERCALDAS" is the more recent of the two (10 Aug).
     expect(rows[0]).toEqual({
-      name: 'mercaldas',
+      name: 'MERCALDAS',
       spent: 150_000,
       expenseCount: 2,
     });
