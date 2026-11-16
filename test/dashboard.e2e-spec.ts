@@ -57,6 +57,10 @@ describe('Dashboard category breakdown (e2e)', () => {
   afterEach(async () => {
     await dataSource.query('DELETE FROM expense');
     await dataSource.query('DELETE FROM envelope');
+    // Personal categories too: they outlived the run, so a test that
+    // renames one collided (409) with the previous run's leftover.
+    // Global ones (userId NULL) are seeded data and stay.
+    await dataSource.query('DELETE FROM category WHERE "userId" IS NOT NULL');
     // Personal categories only - the global set (userId IS NULL) is
     // seeded data every user shares.
     await dataSource.query('DELETE FROM category WHERE "userId" IS NOT NULL');
@@ -142,6 +146,31 @@ describe('Dashboard category breakdown (e2e)', () => {
       .expect(200);
     return res.body as BreakdownRow[];
   }
+
+  it('reports the date span of each envelope in the envelope breakdown', async () => {
+    await seed('tarjetas', undefined, 100);
+    const list = await request(app.getHttpServer())
+      .get('/envelopes')
+      .expect(200);
+    const id = (list.body as { data: { id: string }[] }).data[0].id;
+    await request(app.getHttpServer())
+      .post(`/envelopes/${id}/expenses`)
+      .send({ name: 'otro', amount: 50, currency: 'COP', date: '2026-09-02' })
+      .expect(201);
+
+    const res = await request(app.getHttpServer())
+      .get('/dashboard/envelope-breakdown')
+      .query({ currency: 'COP' })
+      .expect(200);
+
+    expect(res.body).toEqual([
+      expect.objectContaining({
+        envelopeName: 'tarjetas',
+        firstExpenseDate: '2026-08-20',
+        lastExpenseDate: '2026-09-02',
+      }),
+    ]);
+  });
 
   it('groups spend by category, biggest first', async () => {
     const hogar = await createCategory('Hogar');
@@ -337,6 +366,10 @@ describe('Dashboard name breakdown (e2e)', () => {
   afterEach(async () => {
     await dataSource.query('DELETE FROM expense');
     await dataSource.query('DELETE FROM envelope');
+    // Personal categories too: they outlived the run, so a test that
+    // renames one collided (409) with the previous run's leftover.
+    // Global ones (userId NULL) are seeded data and stay.
+    await dataSource.query('DELETE FROM category WHERE "userId" IS NOT NULL');
   });
 
   interface NameBreakdownRow {
@@ -353,7 +386,7 @@ describe('Dashboard name breakdown (e2e)', () => {
     return res.body as NameBreakdownRow[];
   }
 
-  it('folds names that differ only by case into one row', async () => {
+  it('folds names that differ only by case into one row, showing the latest spelling', async () => {
     await request(app.getHttpServer())
       .post('/envelopes')
       .send({ name: 'Supermercado', amount: 1_000_000, currency: 'COP' })
@@ -365,7 +398,7 @@ describe('Dashboard name breakdown (e2e)', () => {
       .expect(200);
     const envelope = (
       list.body as { data: { id: string; name: string }[] }
-    ).data.find((e) => e.name === 'supermercado'); // normalized to lowercase on save
+    ).data.find((e) => e.name === 'Supermercado');
     if (!envelope) throw new Error('seed envelope not created');
 
     await request(app.getHttpServer())
@@ -390,10 +423,196 @@ describe('Dashboard name breakdown (e2e)', () => {
     const rows = await nameBreakdown({ currency: 'COP' });
 
     expect(rows).toHaveLength(1);
+    // "MERCALDAS" is the more recent of the two (10 Aug).
     expect(rows[0]).toEqual({
-      name: 'mercaldas',
+      name: 'MERCALDAS',
       spent: 150_000,
       expenseCount: 2,
+    });
+  });
+});
+
+/**
+ * The summary has to read the same whichever way someone organises
+ * envelopes - the app has both styles in use:
+ *
+ * - one envelope per month ("Octubre - Davi Scoti"), created in the month
+ *   its expenses fall in;
+ * - one long-lived envelope per purpose ("Aseo", "Arriendo") that collects
+ *   every month's expenses.
+ *
+ * Anything "over time" (the monthly chart, the year filter, the years on
+ * offer) therefore follows each expense's own date. It used to follow the
+ * envelope's creation date, which put a whole year of a long-lived
+ * envelope into the month it was created. The envelope totals (assigned,
+ * spent, available, exceeded) are the envelopes' current state and are
+ * not date-filtered at all.
+ */
+describe('Dashboard summary (e2e)', () => {
+  let app: INestApplication;
+  let dataSource: DataSource;
+
+  const mockUser = { id: 'user_test_summary' };
+
+  beforeAll(async () => {
+    assertSafeTestDatabase();
+
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(ClerkAuthGuard)
+      .useValue({
+        canActivate: (context) => {
+          const req = context.switchToHttp().getRequest();
+          req.user = mockUser;
+          return true;
+        },
+      })
+      .compile();
+
+    app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+
+    await app.init();
+    dataSource = moduleFixture.get<DataSource>(DataSource);
+  });
+
+  afterAll(async () => {
+    await dataSource.destroy();
+    await app.close();
+  });
+
+  afterEach(async () => {
+    await dataSource.query('DELETE FROM expense');
+    await dataSource.query('DELETE FROM envelope');
+    // Personal categories too: they outlived the run, so a test that
+    // renames one collided (409) with the previous run's leftover.
+    // Global ones (userId NULL) are seeded data and stay.
+    await dataSource.query('DELETE FROM category WHERE "userId" IS NOT NULL');
+  });
+
+  interface Summary {
+    totalEnvelopes: number;
+    totals: {
+      currency: string;
+      totalAssigned: number;
+      totalSpent: number;
+      totalAvailable: number;
+      totalExceeded: number;
+    }[];
+    chart: { month: string; spent: number }[];
+    chartCurrency: string | null;
+    availableYears: number[];
+  }
+
+  /** Creates an envelope and backdates it, since created_at is set by
+   * the database and cannot be sent through the API. */
+  async function createEnvelope(
+    name: string,
+    amount: number | null,
+    createdAt: string,
+  ) {
+    await request(app.getHttpServer())
+      .post('/envelopes')
+      .send({ name, amount, currency: 'COP' })
+      .expect(201);
+    const [{ id }] = await dataSource.query(
+      'SELECT id FROM envelope WHERE "userId" = $1 ORDER BY created_at DESC LIMIT 1',
+      [mockUser.id],
+    );
+    await dataSource.query(
+      'UPDATE envelope SET created_at = $2 WHERE id = $1',
+      [id, createdAt],
+    );
+    return id as string;
+  }
+
+  async function addExpense(envelopeId: string, amount: number, date: string) {
+    await request(app.getHttpServer())
+      .post(`/envelopes/${envelopeId}/expenses`)
+      .send({ name: 'Item', amount, currency: 'COP', date })
+      .expect(201);
+  }
+
+  async function summary(query: Record<string, string> = {}) {
+    const res = await request(app.getHttpServer())
+      .get('/dashboard/summary')
+      .query(query)
+      .expect(200);
+    return res.body as Summary;
+  }
+
+  it('charts a long-lived envelope by the month each expense happened', async () => {
+    const aseo = await createEnvelope('Aseo', 1_000_000, '2026-01-10');
+    await addExpense(aseo, 100, '2026-01-15');
+    await addExpense(aseo, 200, '2026-03-02');
+    await addExpense(aseo, 300, '2026-03-20');
+    await addExpense(aseo, 400, '2026-06-01');
+
+    const { chart } = await summary();
+
+    expect(chart).toEqual([
+      { month: '2026-01', spent: 100 },
+      { month: '2026-03', spent: 500 },
+      { month: '2026-06', spent: 400 },
+    ]);
+  });
+
+  it('charts one-envelope-per-month the same way it always read', async () => {
+    const sept = await createEnvelope('Septiembre', 500_000, '2026-09-01');
+    const oct = await createEnvelope('Octubre', 500_000, '2026-10-01');
+    await addExpense(sept, 120_000, '2026-09-12');
+    await addExpense(oct, 80_000, '2026-10-03');
+    await addExpense(oct, 70_000, '2026-10-25');
+
+    const { chart } = await summary();
+
+    expect(chart).toEqual([
+      { month: '2026-09', spent: 120_000 },
+      { month: '2026-10', spent: 150_000 },
+    ]);
+  });
+
+  it('filters the chart and the years on offer by expense date', async () => {
+    const aseo = await createEnvelope('Aseo', null, '2025-11-01');
+    await addExpense(aseo, 100, '2025-12-20');
+    await addExpense(aseo, 200, '2026-02-01');
+
+    const all = await summary();
+    expect(all.availableYears).toEqual([2026, 2025]);
+
+    const in2026 = await summary({ year: '2026' });
+    expect(in2026.chart).toEqual([{ month: '2026-02', spent: 200 }]);
+    // Envelope state is not date-filtered: the envelope still exists and
+    // still holds both expenses.
+    expect(in2026.totalEnvelopes).toBe(1);
+    expect(in2026.totals[0].totalSpent).toBe(300);
+  });
+
+  it('reports what is left and what was overspent separately', async () => {
+    // 100 left in one envelope, 50 over in another. Netting them (the
+    // old "available" did) showed 50 and hid both facts.
+    const room = await createEnvelope('Con saldo', 300, '2026-10-01');
+    const over = await createEnvelope('Pasado', 200, '2026-10-01');
+    const unlimited = await createEnvelope('Sin límite', null, '2026-10-01');
+    await addExpense(room, 200, '2026-10-05');
+    await addExpense(over, 250, '2026-10-06');
+    await addExpense(unlimited, 999, '2026-10-07');
+
+    const [cop] = (await summary()).totals;
+
+    expect(cop).toMatchObject({
+      currency: 'COP',
+      totalAssigned: 500,
+      totalSpent: 1449,
+      totalAvailable: 100,
+      totalExceeded: 50,
     });
   });
 });

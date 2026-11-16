@@ -10,6 +10,7 @@ import { DatabaseModule } from './database/database.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { CategoriesModule } from './categories/categories.module';
+import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { CategoriesModule } from './categories/categories.module';
     ExpensesModule,
     DashboardModule,
     CategoriesModule,
+    PaymentMethodsModule,
     HealthCheckModule,
     AuthModule,
   ],

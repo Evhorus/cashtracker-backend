@@ -43,6 +43,8 @@ describe('EnvelopesService', () => {
     const mockRepo = {
       create: jest.fn(),
       findByUserIdLight: jest.fn(),
+      // No expenses unless a test says otherwise.
+      findExpenseDateRanges: jest.fn().mockResolvedValue(new Map()),
       findById: jest.fn(),
       findByIdWithExpenses: jest.fn(),
       update: jest.fn(),
@@ -146,6 +148,10 @@ describe('EnvelopesService', () => {
       });
       expect(result.data).toHaveLength(1);
       expect(result.data[0]).toHaveProperty('id');
+      expect(result.data[0]).toMatchObject({
+        firstExpenseDate: null,
+        lastExpenseDate: null,
+      });
       // The derived status travels with every envelope, so no client has
       // to recompute it - see utils/envelope-status.ts.
       expect(result.data[0]).toHaveProperty('status');

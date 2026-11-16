@@ -33,8 +33,9 @@ export class DashboardService {
     // before it can run (see its own doc comment on why it's scoped to
     // one currency), so this can't be a single Promise.all the way the
     // three queries used to be - the aggregate has to resolve first.
+    // Envelope state is not date-filtered; `year` scopes only the chart.
     const currencyAggregates =
-      await this.dashboardRepository.getSummaryAggregate(userId, year);
+      await this.dashboardRepository.getSummaryAggregate(userId);
     // Already ordered by envelope count DESC - the same "most-used
     // currency" the summary totals put first.
     const primaryCurrency = currencyAggregates[0]?.currency;
@@ -76,7 +77,8 @@ export class DashboardService {
         totalAssigned: row.totalAssigned,
         totalSpent: row.totalSpent,
         totalSpentCapped: row.cappedSpent,
-        totalAvailable: row.totalAssigned - row.cappedSpent,
+        totalAvailable: row.totalAvailable,
+        totalExceeded: row.totalExceeded,
       })),
       // The raw "YYYY-MM" key, not a formatted month name. This used
       // to send `label: "Ago 2026"`, which pinned every client to
@@ -87,7 +89,6 @@ export class DashboardService {
       chart: monthlySpending.map((row) => ({
         month: row.month,
         spent: row.spent,
-        available: row.available,
       })),
       chartCurrency,
       availableYears,

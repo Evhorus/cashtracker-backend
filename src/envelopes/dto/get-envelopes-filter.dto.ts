@@ -5,10 +5,10 @@ import {
   type EnvelopeStatusFilter,
 } from '../utils/envelope-status';
 
-/**
- * Same pattern as GetExpensesFilterDto, minus startDate/endDate/sort -
- * envelopes have no date of their own to filter or sort by.
- */
+export const ENVELOPE_SORTS = ['recent', 'oldest'] as const;
+export type EnvelopeSort = (typeof ENVELOPE_SORTS)[number];
+
+/** Same pattern as GetExpensesFilterDto, minus startDate/endDate. */
 export class GetEnvelopesFilterDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
@@ -26,4 +26,12 @@ export class GetEnvelopesFilterDto extends PaginationQueryDto {
   @IsOptional()
   @IsIn(ENVELOPE_STATUS_FILTERS as readonly string[])
   status?: EnvelopeStatusFilter;
+
+  /**
+   * By the period the envelope covers: its latest expense date, or its
+   * creation date while it has none. Newest first by default.
+   */
+  @IsOptional()
+  @IsIn(ENVELOPE_SORTS)
+  sort?: EnvelopeSort;
 }

@@ -57,6 +57,10 @@ describe('Envelopes (e2e)', () => {
     // NODE_ENV=test itself.
     await dataSource.query('DELETE FROM expense');
     await dataSource.query('DELETE FROM envelope');
+    // Personal categories too: they outlived the run, so a test that
+    // renames one collided (409) with the previous run's leftover.
+    // Global ones (userId NULL) are seeded data and stay.
+    await dataSource.query('DELETE FROM category WHERE "userId" IS NOT NULL');
   });
 
   /**
@@ -188,9 +192,8 @@ describe('Envelopes (e2e)', () => {
         .expect((res) => {
           expect(res.body.meta.total).toBe(1);
           expect(res.body.data).toHaveLength(1);
-          // Names are normalized to lowercase on save (envelope/expense
-          // name is a merchant/thing identifier, not free text).
-          expect(res.body.data[0]).toHaveProperty('name', 'groceries');
+          // Stored as typed: only surrounding/repeated spaces go.
+          expect(res.body.data[0]).toHaveProperty('name', 'Groceries');
           expect(res.body.data[0]).toHaveProperty('currency', 'COP');
           expect(parseFloat(res.body.data[0].spent)).toBe(0);
           expect(res.body.data[0]).not.toHaveProperty('userId'); // DTO doesn't expose userId
@@ -208,7 +211,7 @@ describe('Envelopes (e2e)', () => {
         .expect(200)
         .expect((res) => {
           const envelope = res.body.data.find(
-            (b: { name: string }) => b.name === 'no limit',
+            (b: { name: string }) => b.name === 'No Limit',
           );
           expect(envelope).toBeDefined();
           expect(envelope.amount).toBeNull();
@@ -254,7 +257,7 @@ describe('Envelopes (e2e)', () => {
         .expect(200)
         .expect((res) => {
           expect(res.body.meta.total).toBe(1);
-          expect(res.body.data[0]).toHaveProperty('name', 'groceries');
+          expect(res.body.data[0]).toHaveProperty('name', 'Groceries');
         });
 
       // Matches by category, case-insensitively
@@ -264,7 +267,7 @@ describe('Envelopes (e2e)', () => {
         .expect(200)
         .expect((res) => {
           expect(res.body.meta.total).toBe(1);
-          expect(res.body.data[0]).toHaveProperty('name', 'rent');
+          expect(res.body.data[0]).toHaveProperty('name', 'Rent');
         });
 
       // No match
@@ -275,6 +278,88 @@ describe('Envelopes (e2e)', () => {
         .expect((res) => {
           expect(res.body.meta.total).toBe(0);
         });
+    });
+  });
+
+  describe('/envelopes (GET) expense date range', () => {
+    async function createEnvelopeWithExpenses(name: string, dates: string[]) {
+      await request(app.getHttpServer())
+        .post('/envelopes')
+        .send({ name, amount: 1000, currency: 'COP' })
+        .expect(201);
+      const [{ id }] = await dataSource.query(
+        'SELECT id FROM envelope WHERE name = $1',
+        [name],
+      );
+      for (const date of dates) {
+        await request(app.getHttpServer())
+          .post(`/envelopes/${id}/expenses`)
+          .send({ name: 'gasto', amount: 10, currency: 'COP', date })
+          .expect(201);
+      }
+    }
+
+    it('orders envelopes by the period they cover, newest first by default', async () => {
+      // Created in the opposite order to their periods, so creation
+      // order alone would give the wrong answer.
+      await createEnvelopeWithExpenses('septiembre', ['2026-09-10']);
+      await createEnvelopeWithExpenses('agosto', ['2026-08-10']);
+      await createEnvelopeWithExpenses('octubre', ['2026-10-10']);
+
+      const names = async (query: Record<string, string>) =>
+        (
+          await request(app.getHttpServer())
+            .get('/envelopes')
+            .query(query)
+            .expect(200)
+        ).body.data.map((envelope: { name: string }) => envelope.name);
+
+      expect(await names({})).toEqual(['octubre', 'septiembre', 'agosto']);
+      expect(await names({ sort: 'oldest' })).toEqual([
+        'agosto',
+        'septiembre',
+        'octubre',
+      ]);
+      // Paginates over that order.
+      expect(await names({ sort: 'oldest', limit: '2', page: '2' })).toEqual([
+        'octubre',
+      ]);
+    });
+
+    it('rejects an unknown order', async () => {
+      await request(app.getHttpServer())
+        .get('/envelopes')
+        .query({ sort: 'biggest' })
+        .expect(400);
+    });
+
+    it("reports each envelope's first and last expense date", async () => {
+      // Out of order on purpose: the range is MIN/MAX, not insert order.
+      await createEnvelopeWithExpenses('tarjetas noviembre', [
+        '2026-11-08',
+        '2026-10-09',
+        '2026-10-30',
+      ]);
+      await createEnvelopeWithExpenses('vacio', []);
+
+      const res = await request(app.getHttpServer())
+        .get('/envelopes')
+        .expect(200);
+
+      const byName = Object.fromEntries(
+        res.body.data.map((envelope: { name: string }) => [
+          envelope.name,
+          envelope,
+        ]),
+      );
+      expect(byName['tarjetas noviembre']).toMatchObject({
+        firstExpenseDate: '2026-10-09',
+        lastExpenseDate: '2026-11-08',
+      });
+      expect(byName['vacio']).toMatchObject({
+        firstExpenseDate: null,
+        lastExpenseDate: null,
+      });
     });
   });
 
@@ -655,8 +740,7 @@ describe('Envelopes (e2e)', () => {
 
       // ON DELETE SET NULL - the envelope survives, it just stops being
       // classified, rather than pointing at a category that is gone.
-      // (name comes back lowercased - normalized on save.)
-      expect(envelope.name).toBe('streaming');
+      expect(envelope.name).toBe('Streaming');
       expect(envelope.category).toBeNull();
     });
 
