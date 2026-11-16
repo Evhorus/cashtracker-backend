@@ -7,9 +7,12 @@ import {
   IsPositive,
   IsString,
   IsUUID,
+  Max,
 } from 'class-validator';
 import { normalizeName, normalizeString } from 'src/common/utils/string-utils';
 import { Currency } from 'src/common/enums/currency.enum';
+import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
+import { MAX_AMOUNT } from 'src/common/constants/amounts';
 
 export class CreateEnvelopeDto {
   @IsString()
@@ -24,6 +27,7 @@ export class CreateEnvelopeDto {
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive({ message: 'El monto debe ser mayor a 0' })
+  @Max(MAX_AMOUNT, { message: ERROR_MESSAGES.AMOUNT_TOO_LARGE })
   amount?: number | null;
 
   @IsOptional()

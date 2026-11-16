@@ -26,7 +26,9 @@ export const ERROR_MESSAGES = {
 
   // Validation errors
   AMOUNT_MUST_BE_POSITIVE: 'Amount must be greater than 0',
-  INVALID_DATE_FORMAT: 'Date must be in YYYY-MM-DD format',
+  INVALID_DATE_FORMAT: 'La fecha debe tener el formato YYYY-MM-DD',
+  INVALID_DATE_RANGE: 'La fecha final no puede ser anterior a la inicial',
+  AMOUNT_TOO_LARGE: 'El monto supera el máximo permitido',
 
   // Auth errors
   USER_NOT_AUTHENTICATED: 'User not authenticated',
