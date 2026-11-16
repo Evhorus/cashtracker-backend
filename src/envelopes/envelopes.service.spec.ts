@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { EnvelopesService } from './envelopes.service';
 import { EnvelopesRepository } from './repositories/envelopes.repository';
 import { Envelope } from './entities/envelope.entity';
@@ -47,6 +47,7 @@ describe('EnvelopesService', () => {
       findByIdWithExpenses: jest.fn(),
       update: jest.fn(),
       remove: jest.fn(),
+      hasExpenses: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -274,6 +275,40 @@ describe('EnvelopesService', () => {
       expect(result).toEqual({ message: 'Sobre actualizado' });
       expect(repository.findById).toHaveBeenCalledWith('envelope-123');
       expect(repository.update).toHaveBeenCalledWith('envelope-123', updateDto);
+    });
+
+    it('refuses a currency change once the envelope has expenses', async () => {
+      repository.findById.mockResolvedValue(mockEnvelope);
+      repository.hasExpenses.mockResolvedValue(true);
+
+      await expect(
+        service.update('envelope-123', { currency: Currency.USD }),
+      ).rejects.toThrow(
+        new ConflictException(ERROR_MESSAGES.ENVELOPE_CURRENCY_LOCKED),
+      );
+      expect(repository.update).not.toHaveBeenCalled();
+    });
+
+    it('allows a currency change on an envelope without expenses', async () => {
+      repository.findById.mockResolvedValue(mockEnvelope);
+      repository.hasExpenses.mockResolvedValue(false);
+
+      await service.update('envelope-123', { currency: Currency.USD });
+
+      expect(repository.update).toHaveBeenCalledWith('envelope-123', {
+        currency: Currency.USD,
+      });
+    });
+
+    it('does not treat re-sending the same currency as a change', async () => {
+      repository.findById.mockResolvedValue(mockEnvelope);
+
+      await service.update('envelope-123', {
+        currency: mockEnvelope.currency as Currency,
+      });
+
+      expect(repository.hasExpenses).not.toHaveBeenCalled();
+      expect(repository.update).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when envelope not found', async () => {

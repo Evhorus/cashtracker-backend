@@ -12,10 +12,13 @@ export const ERROR_MESSAGES = {
   // ExpenseExistsGuard - so a different message here would defeat that.
   ENVELOPE_NOT_FOUND: 'Envelope not found',
   ENVELOPE_INVALID_UUID: 'Invalid envelope ID format',
+  ENVELOPE_CURRENCY_LOCKED:
+    'No puedes cambiar la moneda de un sobre que ya tiene gastos',
 
   // Expense errors
   EXPENSE_NOT_FOUND: 'Expense not found',
   EXPENSE_INVALID_UUID: 'Invalid expense ID format',
+  EXPENSE_CURRENCY_MISMATCH: 'La moneda del gasto debe ser la misma del sobre',
 
   // Category errors
   CATEGORY_NOT_FOUND: 'Category not found',

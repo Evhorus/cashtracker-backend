@@ -346,6 +346,71 @@ describe('Envelopes (e2e)', () => {
           expect(res.body).toHaveProperty('message', 'Sobre actualizado');
         });
     });
+
+    async function createCopEnvelope() {
+      await request(app.getHttpServer())
+        .post('/envelopes')
+        .send({ name: 'Currency Lock', amount: 500, currency: 'COP' })
+        .expect(201);
+      const [{ id }] = await dataSource.query(
+        'SELECT id FROM envelope ORDER BY created_at DESC LIMIT 1',
+      );
+      return id as string;
+    }
+
+    it('refuses to change the currency of an envelope that has expenses', async () => {
+      // Its `spent` is a sum in the old currency; relabelling it would
+      // silently turn 100.000 COP into 100.000 USD.
+      const envelopeId = await createCopEnvelope();
+      await request(app.getHttpServer())
+        .post(`/envelopes/${envelopeId}/expenses`)
+        .send({
+          name: 'Mercado',
+          amount: 100,
+          currency: 'COP',
+          date: '2026-11-16',
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/envelopes/${envelopeId}`)
+        .send({ currency: 'USD' })
+        .expect(409);
+
+      const [row] = await dataSource.query(
+        'SELECT currency FROM envelope WHERE id = $1',
+        [envelopeId],
+      );
+      expect(row.currency).toBe('COP');
+    });
+
+    it('still lets an envelope without expenses change currency', async () => {
+      const envelopeId = await createCopEnvelope();
+
+      await request(app.getHttpServer())
+        .patch(`/envelopes/${envelopeId}`)
+        .send({ currency: 'USD' })
+        .expect(200);
+    });
+
+    it('accepts re-sending the same currency on an envelope with expenses', async () => {
+      // The edit form always sends the currency field back unchanged.
+      const envelopeId = await createCopEnvelope();
+      await request(app.getHttpServer())
+        .post(`/envelopes/${envelopeId}/expenses`)
+        .send({
+          name: 'Mercado',
+          amount: 100,
+          currency: 'COP',
+          date: '2026-11-16',
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/envelopes/${envelopeId}`)
+        .send({ name: 'Renamed', currency: 'COP' })
+        .expect(200);
+    });
   });
 
   describe('/envelopes/:envelopeId (DELETE)', () => {

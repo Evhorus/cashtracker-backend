@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { ExpensesService } from './expenses.service';
 import { ExpensesRepository } from './repositories/expenses.repository';
@@ -51,8 +51,8 @@ describe('ExpensesService', () => {
     };
 
     const mockEnvelopesRepo = {
-      incrementSpent: jest.fn(),
-      decrementSpent: jest.fn(),
+      findByIdForUpdate: jest.fn(),
+      recalculateSpent: jest.fn(),
       findById: jest.fn(),
     };
 
@@ -83,49 +83,144 @@ describe('ExpensesService', () => {
   });
 
   describe('create', () => {
-    it('should create an expense and increment envelope spent', async () => {
-      // Currency, not the string 'COP': CreateExpenseDto types it as
-      // the enum, so an untyped literal made this call not typecheck -
-      // the one error keeping `tsc --noEmit` from passing on this repo.
-      const createDto = {
-        name: 'Milk',
-        amount: 10,
-        currency: Currency.COP,
-        date: new Date(),
-      };
-      expensesRepository.create.mockResolvedValue(mockExpense);
+    // Currency, not the string 'COP': CreateExpenseDto types it as the
+    // enum, so an untyped literal would not typecheck.
+    const createDto = {
+      name: 'Milk',
+      amount: 10,
+      currency: Currency.COP,
+      date: new Date(),
+    };
+
+    it('locks the envelope, creates the expense and recomputes spent', async () => {
+      envelopesRepository.findByIdForUpdate.mockResolvedValue(mockEnvelope);
 
       const result = await service.create('envelope-123', createDto);
 
       expect(result).toEqual({ message: 'Gasto creado' });
       expect(dataSource.transaction).toHaveBeenCalled();
+      expect(envelopesRepository.findByIdForUpdate).toHaveBeenCalledWith(
+        'envelope-123',
+        entityManager,
+      );
       expect(expensesRepository.create).toHaveBeenCalledWith(
         { ...createDto, envelopeId: 'envelope-123' },
         entityManager,
       );
-      expect(envelopesRepository.incrementSpent).toHaveBeenCalledWith(
+      expect(envelopesRepository.recalculateSpent).toHaveBeenCalledWith(
         'envelope-123',
-        10,
         entityManager,
       );
+    });
+
+    it('rejects a currency other than the envelope one', async () => {
+      envelopesRepository.findByIdForUpdate.mockResolvedValue(mockEnvelope);
+
+      await expect(
+        service.create('envelope-123', {
+          ...createDto,
+          currency: Currency.USD,
+        }),
+      ).rejects.toThrow(
+        new BadRequestException(ERROR_MESSAGES.EXPENSE_CURRENCY_MISMATCH),
+      );
+      expect(expensesRepository.create).not.toHaveBeenCalled();
+      expect(envelopesRepository.recalculateSpent).not.toHaveBeenCalled();
+    });
+
+    it('fails with 404 if the envelope disappeared before the lock', async () => {
+      envelopesRepository.findByIdForUpdate.mockResolvedValue(null);
+
+      await expect(service.create('envelope-123', createDto)).rejects.toThrow(
+        new NotFoundException(ERROR_MESSAGES.ENVELOPE_NOT_FOUND),
+      );
+      expect(expensesRepository.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('update', () => {
+    it('updates inside the lock and recomputes spent', async () => {
+      envelopesRepository.findByIdForUpdate.mockResolvedValue(mockEnvelope);
+      expensesRepository.findById.mockResolvedValue(mockExpense);
+
+      const result = await service.update({
+        envelope: mockEnvelope,
+        expenseId: 'expense-123',
+        updateExpenseDto: { amount: 15 },
+      });
+
+      expect(result).toEqual({ message: 'Gasto actualizado' });
+      // Re-read with the transaction's manager, not the guard's stale copy.
+      expect(expensesRepository.findById).toHaveBeenCalledWith(
+        'expense-123',
+        entityManager,
+      );
+      expect(expensesRepository.update).toHaveBeenCalledWith(
+        'expense-123',
+        { amount: 15 },
+        entityManager,
+      );
+      expect(envelopesRepository.recalculateSpent).toHaveBeenCalledWith(
+        mockEnvelope.id,
+        entityManager,
+      );
+    });
+
+    it('rejects moving the expense to another currency', async () => {
+      envelopesRepository.findByIdForUpdate.mockResolvedValue(mockEnvelope);
+      expensesRepository.findById.mockResolvedValue(mockExpense);
+
+      await expect(
+        service.update({
+          envelope: mockEnvelope,
+          expenseId: 'expense-123',
+          updateExpenseDto: { currency: Currency.USD },
+        }),
+      ).rejects.toThrow(
+        new BadRequestException(ERROR_MESSAGES.EXPENSE_CURRENCY_MISMATCH),
+      );
+      expect(expensesRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('fails with 404 if a concurrent request already deleted it', async () => {
+      envelopesRepository.findByIdForUpdate.mockResolvedValue(mockEnvelope);
+      expensesRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.update({
+          envelope: mockEnvelope,
+          expenseId: 'expense-123',
+          updateExpenseDto: { amount: 15 },
+        }),
+      ).rejects.toThrow(
+        new NotFoundException(ERROR_MESSAGES.EXPENSE_NOT_FOUND),
+      );
+      expect(expensesRepository.update).not.toHaveBeenCalled();
+      expect(envelopesRepository.recalculateSpent).not.toHaveBeenCalled();
     });
   });
 
   describe('remove', () => {
-    it('should remove an expense and decrement envelope spent', async () => {
+    it('deletes inside the lock and recomputes spent', async () => {
+      envelopesRepository.findByIdForUpdate.mockResolvedValue(mockEnvelope);
       expensesRepository.findById.mockResolvedValue(mockExpense);
 
       const result = await service.remove(mockEnvelope, 'expense-123');
 
       expect(result).toEqual({ message: 'Gasto eliminado' });
-      expect(envelopesRepository.decrementSpent).toHaveBeenCalledWith(
+      expect(expensesRepository.delete).toHaveBeenCalledWith(
+        'expense-123',
+        entityManager,
+      );
+      expect(envelopesRepository.recalculateSpent).toHaveBeenCalledWith(
         mockEnvelope.id,
-        mockExpense.amount,
         entityManager,
       );
     });
 
-    it('should throw NotFoundException if expense does not exist', async () => {
+    it('fails with 404 and changes nothing if the expense is already gone', async () => {
+      // The second of two simultaneous deletes lands here.
+      envelopesRepository.findByIdForUpdate.mockResolvedValue(mockEnvelope);
       expensesRepository.findById.mockResolvedValue(null);
 
       await expect(
@@ -133,6 +228,21 @@ describe('ExpensesService', () => {
       ).rejects.toThrow(
         new NotFoundException(ERROR_MESSAGES.EXPENSE_NOT_FOUND),
       );
+      expect(expensesRepository.delete).not.toHaveBeenCalled();
+      expect(envelopesRepository.recalculateSpent).not.toHaveBeenCalled();
+    });
+
+    it('treats an expense from another envelope as not found', async () => {
+      envelopesRepository.findByIdForUpdate.mockResolvedValue(mockEnvelope);
+      expensesRepository.findById.mockResolvedValue({
+        ...mockExpense,
+        envelopeId: 'another-envelope',
+      });
+
+      await expect(service.remove(mockEnvelope, 'expense-123')).rejects.toThrow(
+        new NotFoundException(ERROR_MESSAGES.EXPENSE_NOT_FOUND),
+      );
+      expect(expensesRepository.delete).not.toHaveBeenCalled();
     });
   });
 

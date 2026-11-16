@@ -17,8 +17,9 @@ export class ExpensesRepository {
     private readonly repository: Repository<Expense>,
   ) {}
 
-  async findById(id: string) {
-    return this.repository.findOneBy({ id });
+  async findById(id: string, manager?: EntityManager) {
+    const repo = manager ? manager.getRepository(Expense) : this.repository;
+    return repo.findOneBy({ id });
   }
 
   async create(expenseData: Partial<Expense>, manager?: EntityManager) {
@@ -39,18 +40,6 @@ export class ExpensesRepository {
   async delete(id: string, manager?: EntityManager) {
     const repo = manager ? manager.getRepository(Expense) : this.repository;
     return repo.delete({ id });
-  }
-
-  async calculateTotalSpent(envelopeId: string, manager?: EntityManager) {
-    const repo = manager ? manager.getRepository(Expense) : this.repository;
-
-    const result = await repo
-      .createQueryBuilder('expense')
-      .where('expense.envelopeId = :envelopeId', { envelopeId })
-      .select('SUM(expense.amount)', 'sum')
-      .getRawOne<{ sum: string }>();
-
-    return result && result.sum ? parseFloat(result.sum) : 0;
   }
 
   /**

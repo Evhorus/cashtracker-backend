@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { Envelope } from '../entities/envelope.entity';
+import { Expense } from '../../expenses/entities/expense.entity';
 import {
   buildEnvelopeStatusPredicate,
   type EnvelopeStatusFilter,
@@ -130,18 +131,43 @@ export class EnvelopesRepository {
   }
 
   /**
-   * Increment spent amount
+   * Loads the envelope with a row lock (`SELECT ... FOR UPDATE`) inside
+   * the caller's transaction. Every write that touches an envelope's
+   * expenses takes this lock first, so two requests on the same envelope
+   * (a double tap, a retry, two devices) run one after the other instead
+   * of both acting on what they read before the other committed.
    */
-  async incrementSpent(id: string, amount: number, manager?: EntityManager) {
-    const repo = manager ? manager.getRepository(Envelope) : this.repository;
-    return repo.increment({ id }, 'spent', amount);
+  async findByIdForUpdate(id: string, manager: EntityManager) {
+    return manager.getRepository(Envelope).findOne({
+      where: { id },
+      lock: { mode: 'pessimistic_write' },
+    });
   }
 
   /**
-   * Decrement spent amount
+   * Sets `spent` to the exact sum of the envelope's expenses.
+   *
+   * `spent` is a stored total so lists and filters can read it without
+   * aggregating. It used to be adjusted by increments and decrements,
+   * which drift for good the moment one is applied twice or lost.
+   * Recomputing it from the rows on every write keeps it exact by
+   * construction and repairs any earlier drift on the next write.
    */
-  async decrementSpent(id: string, amount: number, manager?: EntityManager) {
-    const repo = manager ? manager.getRepository(Envelope) : this.repository;
-    return repo.decrement({ id }, 'spent', amount);
+  async recalculateSpent(id: string, manager: EntityManager) {
+    await manager.query(
+      `UPDATE envelope
+         SET spent = (
+           SELECT COALESCE(SUM(amount), 0) FROM expense WHERE "envelopeId" = $1
+         )
+       WHERE id = $1`,
+      [id],
+    );
+  }
+
+  /** Whether the envelope has at least one expense. */
+  async hasExpenses(id: string) {
+    return this.repository.manager.exists(Expense, {
+      where: { envelopeId: id },
+    });
   }
 }
