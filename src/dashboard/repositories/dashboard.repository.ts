@@ -172,6 +172,10 @@ export class DashboardRepository {
       .addSelect('envelope.name', 'envelopeName')
       .addSelect('COALESCE(SUM(expense.amount), 0)', 'spent')
       .addSelect('COUNT(*)', 'expenseCount')
+      // `::text` keeps them YYYY-MM-DD - see
+      // EnvelopesRepository.findExpenseDateRanges.
+      .addSelect('MIN(expense.date)::text', 'firstExpenseDate')
+      .addSelect('MAX(expense.date)::text', 'lastExpenseDate')
       .groupBy('envelope.id')
       .addGroupBy('envelope.name')
       .orderBy('SUM(expense.amount)', 'DESC')
@@ -180,6 +184,8 @@ export class DashboardRepository {
         envelopeName: string;
         spent: string;
         expenseCount: string;
+        firstExpenseDate: string;
+        lastExpenseDate: string;
       }>();
 
     return rows.map((row) => ({
@@ -187,6 +193,8 @@ export class DashboardRepository {
       envelopeName: row.envelopeName,
       spent: Number(row.spent),
       expenseCount: Number(row.expenseCount),
+      firstExpenseDate: row.firstExpenseDate,
+      lastExpenseDate: row.lastExpenseDate,
     }));
   }
 

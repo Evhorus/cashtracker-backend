@@ -255,6 +255,8 @@ describe('DashboardService', () => {
           envelopeName: 'Arriendos',
           spent: 8_000_000,
           expenseCount: 8,
+          firstExpenseDate: '2026-01-05',
+          lastExpenseDate: '2026-08-05',
         },
       ];
       repository.getEnvelopeBreakdown.mockResolvedValue(rows);

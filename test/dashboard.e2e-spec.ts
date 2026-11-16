@@ -147,6 +147,31 @@ describe('Dashboard category breakdown (e2e)', () => {
     return res.body as BreakdownRow[];
   }
 
+  it('reports the date span of each envelope in the envelope breakdown', async () => {
+    await seed('tarjetas', undefined, 100);
+    const list = await request(app.getHttpServer())
+      .get('/envelopes')
+      .expect(200);
+    const id = (list.body as { data: { id: string }[] }).data[0].id;
+    await request(app.getHttpServer())
+      .post(`/envelopes/${id}/expenses`)
+      .send({ name: 'otro', amount: 50, currency: 'COP', date: '2026-09-02' })
+      .expect(201);
+
+    const res = await request(app.getHttpServer())
+      .get('/dashboard/envelope-breakdown')
+      .query({ currency: 'COP' })
+      .expect(200);
+
+    expect(res.body).toEqual([
+      expect.objectContaining({
+        envelopeName: 'tarjetas',
+        firstExpenseDate: '2026-08-20',
+        lastExpenseDate: '2026-09-02',
+      }),
+    ]);
+  });
+
   it('groups spend by category, biggest first', async () => {
     const hogar = await createCategory('Hogar');
     const transporte = await createCategory('Transporte');

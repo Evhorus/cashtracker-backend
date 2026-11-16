@@ -14,4 +14,10 @@ export class DashboardEnvelopeBreakdownDto {
 
   /** How many expenses contributed. */
   expenseCount: number;
+
+  /** Date span (YYYY-MM-DD) of those expenses: envelopes can share a
+   * name, and this is what tells them apart. */
+  firstExpenseDate: string;
+
+  lastExpenseDate: string;
 }
