@@ -258,6 +258,25 @@ describe('Dashboard category breakdown (e2e)', () => {
       .expect(400);
   });
 
+  it('rejects a date range that ends before it starts', async () => {
+    // It used to be accepted and silently matched nothing.
+    await request(app.getHttpServer())
+      .get('/dashboard/category-breakdown')
+      .query({
+        currency: 'COP',
+        startDate: '2026-08-31',
+        endDate: '2026-08-01',
+      })
+      .expect(400);
+  });
+
+  it('rejects a timestamp where a calendar date is expected', async () => {
+    await request(app.getHttpServer())
+      .get('/dashboard/category-breakdown')
+      .query({ currency: 'COP', startDate: '2026-08-01T00:00:00Z' })
+      .expect(400);
+  });
+
   it('narrows to a calendar year', async () => {
     const hogar = await createCategory('Hogar');
     await seed('a', hogar, 100);
