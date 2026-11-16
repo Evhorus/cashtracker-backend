@@ -6,13 +6,13 @@ import {
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages';
 import { PaginatedResponseDto } from 'src/common/dto/paginated-response.dto';
 import { EnvelopeResponseDto } from './dto/envelope-response.dto';
+import type { EnvelopeListFilters } from './repositories/envelopes.repository';
 import { EnvelopeWithExpensesResponseDto } from './dto/envelope-with-expenses-response.dto';
 import { CreateEnvelopeDto } from './dto/create-envelope.dto';
 import { UpdateEnvelopeDto } from './dto/update-envelope.dto';
 import { EnvelopesRepository } from './repositories/envelopes.repository';
 import { Envelope } from './entities/envelope.entity';
 import { CategoriesRepository } from '../categories/repositories/categories.repository';
-import { type EnvelopeStatusFilter } from './utils/envelope-status';
 
 @Injectable()
 export class EnvelopesService {
@@ -68,7 +68,7 @@ export class EnvelopesService {
     userId: string,
     page: number,
     limit: number,
-    filters: { search?: string; status?: EnvelopeStatusFilter } = {},
+    filters: EnvelopeListFilters = {},
   ) {
     const [envelopes, total] = await this.envelopesRepository.findByUserIdLight(
       userId,
@@ -77,8 +77,14 @@ export class EnvelopesService {
       filters,
     );
 
+    const expenseDates = await this.envelopesRepository.findExpenseDateRanges(
+      envelopes.map((envelope) => envelope.id),
+    );
+
     return new PaginatedResponseDto(
-      EnvelopeResponseDto.fromEntities(envelopes),
+      envelopes.map((envelope) =>
+        EnvelopeResponseDto.fromEntity(envelope, expenseDates.get(envelope.id)),
+      ),
       total,
       page,
       limit,

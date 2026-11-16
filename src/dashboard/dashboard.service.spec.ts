@@ -37,185 +37,129 @@ describe('DashboardService', () => {
   });
 
   describe('getSummary', () => {
-    it('should keep a single currency as one totals entry, matching the old flat shape', async () => {
-      // Arrange
+    /** One aggregate row as the repository returns it. */
+    const row = (
+      currency: string,
+      count: number,
+      over: Partial<{
+        totalAssigned: number;
+        totalSpent: number;
+        cappedSpent: number;
+        totalAvailable: number;
+        totalExceeded: number;
+      }> = {},
+    ) => ({
+      currency,
+      count,
+      totalAssigned: 0,
+      totalSpent: 0,
+      cappedSpent: 0,
+      totalAvailable: 0,
+      totalExceeded: 0,
+      ...over,
+    });
+
+    it('passes the envelope totals through, available and exceeded kept apart', async () => {
       repository.getSummaryAggregate.mockResolvedValue([
-        {
-          currency: 'COP',
-          count: 3,
+        row('COP', 3, {
           totalAssigned: 1_000_000,
-          totalSpent: 400_000,
-          cappedSpent: 400_000,
-        },
+          totalSpent: 1_050_000,
+          cappedSpent: 900_000,
+          totalAvailable: 250_000,
+          totalExceeded: 150_000,
+        }),
       ]);
       repository.getMonthlySpending.mockResolvedValue([]);
       repository.getAvailableYears.mockResolvedValue([2026]);
 
-      // Act
       const result = await service.getSummary('user-123');
 
-      // Assert
       expect(result.totalEnvelopes).toBe(3);
       expect(result.totals).toEqual([
         {
           currency: 'COP',
           totalEnvelopes: 3,
           totalAssigned: 1_000_000,
-          totalSpent: 400_000,
-          totalSpentCapped: 400_000,
-          totalAvailable: 600_000,
+          totalSpent: 1_050_000,
+          totalSpentCapped: 900_000,
+          totalAvailable: 250_000,
+          totalExceeded: 150_000,
         },
       ]);
     });
 
-    it("should keep totalSpentCapped (not totalSpent) as what totalAvailable is actually derived from, so an unlimited envelope's spending never makes the two look inconsistent", async () => {
-      // Arrange - one currency where an uncapped envelope's spending
-      // makes totalSpent (400_000 + 150_000) bigger than totalAssigned
-      // itself. If totalAvailable were derived from totalSpent instead
-      // of totalSpentCapped, it would go negative even though the
-      // capped envelope is nowhere near its limit.
-      repository.getSummaryAggregate.mockResolvedValue([
-        {
-          currency: 'COP',
-          count: 2,
-          totalAssigned: 1_000_000,
-          totalSpent: 550_000,
-          cappedSpent: 400_000,
-        },
-      ]);
+    it('never date-filters the envelope totals; year scopes only the chart', async () => {
+      repository.getSummaryAggregate.mockResolvedValue([row('COP', 1)]);
       repository.getMonthlySpending.mockResolvedValue([]);
       repository.getAvailableYears.mockResolvedValue([2026]);
 
-      // Act
-      const result = await service.getSummary('user-123');
+      await service.getSummary('user-123', 2025);
 
-      // Assert
-      expect(result.totals).toEqual([
-        {
-          currency: 'COP',
-          totalEnvelopes: 2,
-          totalAssigned: 1_000_000,
-          totalSpent: 550_000,
-          totalSpentCapped: 400_000,
-          totalAvailable: 600_000,
-        },
-      ]);
+      expect(repository.getSummaryAggregate).toHaveBeenCalledWith('user-123');
+      expect(repository.getMonthlySpending).toHaveBeenCalledWith(
+        'user-123',
+        2025,
+        12,
+        'COP',
+      );
     });
 
-    it('should never sum money across currencies - one totals entry per currency, each computed from only its own envelopes', async () => {
-      // Arrange
+    it('never sums money across currencies - one totals entry per currency', async () => {
       repository.getSummaryAggregate.mockResolvedValue([
-        {
-          currency: 'COP',
-          count: 2,
-          totalAssigned: 1_000_000,
-          totalSpent: 400_000,
-          cappedSpent: 400_000,
-        },
-        {
-          currency: 'USD',
-          count: 1,
-          totalAssigned: 500,
-          totalSpent: 100,
-          cappedSpent: 100,
-        },
+        row('COP', 2, { totalAssigned: 1_000_000, totalAvailable: 600_000 }),
+        row('USD', 1, { totalAssigned: 500, totalAvailable: 400 }),
       ]);
       repository.getMonthlySpending.mockResolvedValue([]);
       repository.getAvailableYears.mockResolvedValue([2026]);
 
-      // Act
       const result = await service.getSummary('user-123');
 
-      // Assert - totalEnvelopes is currency-agnostic (sums the counts),
-      // but the money totals stay split, one entry per currency.
       expect(result.totalEnvelopes).toBe(3);
-      expect(result.totals).toEqual([
-        {
-          currency: 'COP',
-          totalEnvelopes: 2,
-          totalAssigned: 1_000_000,
-          totalSpent: 400_000,
-          totalSpentCapped: 400_000,
-          totalAvailable: 600_000,
-        },
-        {
-          currency: 'USD',
-          totalEnvelopes: 1,
-          totalAssigned: 500,
-          totalSpent: 100,
-          totalSpentCapped: 100,
-          totalAvailable: 400,
-        },
+      expect(result.totals.map((t) => [t.currency, t.totalAvailable])).toEqual([
+        ['COP', 600_000],
+        ['USD', 400],
       ]);
     });
 
-    it('should return an empty totals array and zero totalEnvelopes when the user has no envelopes', async () => {
-      // Arrange
+    it('returns empty totals and zero envelopes for a user with none', async () => {
       repository.getSummaryAggregate.mockResolvedValue([]);
-      repository.getMonthlySpending.mockResolvedValue([]);
       repository.getAvailableYears.mockResolvedValue([]);
 
-      // Act
       const result = await service.getSummary('user-123');
 
-      // Assert
       expect(result.totalEnvelopes).toBe(0);
       expect(result.totals).toEqual([]);
     });
 
-    it('should scope the monthly chart to the primary (most-used) currency', async () => {
-      // Arrange - USD listed first here on purpose: the aggregate is
-      // already sorted by count DESC by the repository, so the service
-      // shouldn't need to re-sort, just trust row 0.
+    it('scopes the monthly chart to the primary (most-used) currency', async () => {
+      // Already sorted by count DESC by the repository: trust row 0.
       repository.getSummaryAggregate.mockResolvedValue([
-        {
-          currency: 'USD',
-          count: 5,
-          totalAssigned: 1000,
-          totalSpent: 200,
-          cappedSpent: 200,
-        },
-        {
-          currency: 'COP',
-          count: 1,
-          totalAssigned: 100_000,
-          totalSpent: 0,
-          cappedSpent: 0,
-        },
+        row('USD', 5),
+        row('COP', 1),
       ]);
       repository.getMonthlySpending.mockResolvedValue([
-        { month: '2026-08', spent: 200, available: 800 },
+        { month: '2026-08', spent: 200 },
       ]);
       repository.getAvailableYears.mockResolvedValue([2026]);
 
-      // Act
       const result = await service.getSummary('user-123');
 
-      // Assert
       expect(repository.getMonthlySpending).toHaveBeenCalledWith(
         'user-123',
         undefined,
         12,
         'USD',
       );
-      // The raw month key, passed through untouched - this used to
-      // assert 'Ago', a Spanish month name the service formatted
-      // itself, which is exactly what made the response
-      // Spanish-only.
-      expect(result.chart).toEqual([
-        { month: '2026-08', spent: 200, available: 800 },
-      ]);
+      // The raw month key, untouched - the client formats it.
+      expect(result.chart).toEqual([{ month: '2026-08', spent: 200 }]);
     });
 
-    it('should skip the monthly spending query entirely when there are no envelopes', async () => {
-      // Arrange
+    it('skips the monthly spending query when there are no envelopes', async () => {
       repository.getSummaryAggregate.mockResolvedValue([]);
       repository.getAvailableYears.mockResolvedValue([]);
 
-      // Act
       const result = await service.getSummary('user-123');
 
-      // Assert
       expect(repository.getMonthlySpending).not.toHaveBeenCalled();
       expect(result.chart).toEqual([]);
     });
@@ -311,6 +255,8 @@ describe('DashboardService', () => {
           envelopeName: 'Arriendos',
           spent: 8_000_000,
           expenseCount: 8,
+          firstExpenseDate: '2026-01-05',
+          lastExpenseDate: '2026-08-05',
         },
       ];
       repository.getEnvelopeBreakdown.mockResolvedValue(rows);

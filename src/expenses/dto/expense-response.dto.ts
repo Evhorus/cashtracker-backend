@@ -1,4 +1,5 @@
 import { Expense } from '../entities/expense.entity';
+import { ExpensePaymentMethodDto } from '../../payment-methods/dto/payment-method-response.dto';
 
 /**
  * Response DTO for Expense entity
@@ -11,6 +12,8 @@ export class ExpenseResponseDto {
   currency: string;
   date: Date;
   description?: string;
+  /** What it was paid with, or null. */
+  paymentMethod: ExpensePaymentMethodDto | null;
   createdAt: Date;
   updatedAt: Date;
 
@@ -25,6 +28,7 @@ export class ExpenseResponseDto {
       currency: expense.currency,
       date: expense.date,
       description: expense.description,
+      paymentMethod: ExpensePaymentMethodDto.fromEntity(expense.paymentMethod),
       createdAt: expense.createdAt,
       updatedAt: expense.updatedAt,
     };

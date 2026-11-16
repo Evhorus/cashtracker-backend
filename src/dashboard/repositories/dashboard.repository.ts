@@ -10,6 +10,8 @@ interface SummaryAggregateRow {
   totalAssigned: string;
   totalSpent: string;
   cappedSpent: string;
+  totalAvailable: string;
+  totalExceeded: string;
 }
 
 interface RecentExpenseRow {
@@ -37,25 +39,13 @@ export class DashboardRepository {
     private readonly expenseRepository: Repository<Expense>,
   ) {}
 
-  private withUserAndYear(userId: string, year?: number) {
-    const qb = this.repository
-      .createQueryBuilder('envelope')
-      .where('envelope.userId = :userId', { userId });
-
-    if (year) {
-      qb.andWhere('EXTRACT(YEAR FROM envelope.createdAt) = :year', { year });
-    }
-
-    return qb;
-  }
-
   /**
    * Shared base for the four "breakdown" queries (category, envelope,
    * name, total) - all four group the same underlying set of expenses,
    * just along a different axis, so they all start from one query.
    *
    * Filters by each expense's own `date`, not the envelope's
-   * `createdAt` the way withUserAndYear above does - an envelope in
+   * `createdAt` - an envelope in
    * this app can carry expenses spanning several months (e.g. a rent
    * envelope created in September with expenses dated back to
    * February), so scoping a period-filtered breakdown to the envelope's
@@ -182,6 +172,10 @@ export class DashboardRepository {
       .addSelect('envelope.name', 'envelopeName')
       .addSelect('COALESCE(SUM(expense.amount), 0)', 'spent')
       .addSelect('COUNT(*)', 'expenseCount')
+      // `::text` keeps them YYYY-MM-DD - see
+      // EnvelopesRepository.findExpenseDateRanges.
+      .addSelect('MIN(expense.date)::text', 'firstExpenseDate')
+      .addSelect('MAX(expense.date)::text', 'lastExpenseDate')
       .groupBy('envelope.id')
       .addGroupBy('envelope.name')
       .orderBy('SUM(expense.amount)', 'DESC')
@@ -190,6 +184,8 @@ export class DashboardRepository {
         envelopeName: string;
         spent: string;
         expenseCount: string;
+        firstExpenseDate: string;
+        lastExpenseDate: string;
       }>();
 
     return rows.map((row) => ({
@@ -197,6 +193,8 @@ export class DashboardRepository {
       envelopeName: row.envelopeName,
       spent: Number(row.spent),
       expenseCount: Number(row.expenseCount),
+      firstExpenseDate: row.firstExpenseDate,
+      lastExpenseDate: row.lastExpenseDate,
     }));
   }
 
@@ -209,7 +207,9 @@ export class DashboardRepository {
    * touches casing - "Mercaldas" and "MERCALDAS" are both valid stored
    * values for the same merchant (typing habits, bulk imports from a
    * bank export, ...). Grouping on `LOWER(expense.name)` instead of the
-   * raw column keeps those from splitting into separate rows here.
+   * raw column keeps those from splitting into separate rows here; the
+   * row shows the most recent spelling, so it reads the way the user
+   * writes it now.
    */
   async getNameBreakdown(
     userId: string,
@@ -221,7 +221,10 @@ export class DashboardRepository {
       currency,
       filters,
     )
-      .select('LOWER(expense.name)', 'name')
+      .select(
+        '(ARRAY_AGG(expense.name ORDER BY expense.date DESC, expense.createdAt DESC))[1]',
+        'name',
+      )
       .addSelect('COALESCE(SUM(expense.amount), 0)', 'spent')
       .addSelect('COUNT(*)', 'expenseCount')
       .groupBy('LOWER(expense.name)')
@@ -266,16 +269,25 @@ export class DashboardRepository {
   }
 
   /**
-   * Aggregate query grouped by currency: envelope count, sum of assigned
-   * amounts (capped envelopes only), sum of spent (all envelopes), and
-   * sum of spent restricted to capped envelopes (needed to compute
-   * totalAvailable without including unlimited envelopes as if they had
-   * a $0 budget) - one row per currency the user has envelopes in.
-   * Money in different currencies is never one unit, so this can't be a
-   * single flat aggregate the way it used to be.
+   * The current state of the user's envelopes, one row per currency
+   * (money in different currencies is never one unit). Deliberately not
+   * date-filtered: an envelope's limit and spent are its state today,
+   * whether it covers one month or collects every month's expenses.
+   *
+   * - totalAssigned: sum of limits (unlimited envelopes have none).
+   * - totalSpent: every envelope's spent, unlimited ones included.
+   * - cappedSpent: spent within limited envelopes only.
+   * - totalAvailable: what is still left in envelopes under their limit.
+   * - totalExceeded: how far envelopes over their limit went past it.
+   *
+   * Available and exceeded are kept apart on purpose. Netting them (limit
+   * minus spent across all envelopes) showed one small number that hid
+   * both "there is room here" and "this one is over".
    */
-  async getSummaryAggregate(userId: string, year?: number) {
-    const rows = await this.withUserAndYear(userId, year)
+  async getSummaryAggregate(userId: string) {
+    const rows = await this.repository
+      .createQueryBuilder('envelope')
+      .where('envelope.userId = :userId', { userId })
       .select('envelope.currency', 'currency')
       .addSelect('COUNT(*)', 'count')
       .addSelect('COALESCE(SUM(envelope.amount), 0)', 'totalAssigned')
@@ -284,12 +296,18 @@ export class DashboardRepository {
         'COALESCE(SUM(CASE WHEN envelope.amount IS NOT NULL THEN envelope.spent ELSE 0 END), 0)',
         'cappedSpent',
       )
+      .addSelect(
+        'COALESCE(SUM(CASE WHEN envelope.amount IS NOT NULL THEN GREATEST(envelope.amount - envelope.spent, 0) ELSE 0 END), 0)',
+        'totalAvailable',
+      )
+      .addSelect(
+        'COALESCE(SUM(CASE WHEN envelope.amount IS NOT NULL THEN GREATEST(envelope.spent - envelope.amount, 0) ELSE 0 END), 0)',
+        'totalExceeded',
+      )
       .groupBy('envelope.currency')
       // Most-used currency first (by envelope count) - GROUP BY alone
-      // has no defined row order, and the frontend renders the first
-      // entry inline as the "primary" one, the rest in their own
-      // labeled rows below. Without this, which currency ends up
-      // "primary" is arbitrary.
+      // has no defined row order, and the frontend treats the first
+      // entry as the primary one.
       .orderBy('count', 'DESC')
       .getRawMany<SummaryAggregateRow>();
 
@@ -299,27 +317,21 @@ export class DashboardRepository {
       totalAssigned: Number(row.totalAssigned),
       totalSpent: Number(row.totalSpent),
       cappedSpent: Number(row.cappedSpent),
+      totalAvailable: Number(row.totalAvailable),
+      totalExceeded: Number(row.totalExceeded),
     }));
   }
 
   /**
-   * Spending grouped by calendar month (of envelope.createdAt), most
-   * recent `limit` months, returned chronologically ascending. Scoped to
-   * a single `currency` - summing spent/available across currencies
-   * would mix units on the same bars the same way the old flat summary
-   * totals did (see getSummaryAggregate's doc comment). The service
-   * picks the user's most-used currency and passes it in here; a
-   * genuine per-currency chart (multiple charts, or a picker) is a
-   * bigger UI change than scoping to one.
+   * Spending per calendar month of each expense's own date, most recent
+   * `limit` months, returned oldest first. Scoped to one currency, so a
+   * bar never adds pesos to dollars.
    *
-   * Grouping by envelope (the previous chart) mixed unrelated axes -
-   * envelopes here are really "one account for one month" (e.g.
-   * "Marzo Rappi", "Marzo Scotiobank"), so a per-envelope chart bounced
-   * between accounts and months with no consistent order. Per-month is
-   * the one grouping that's both meaningful on its own (this app's
-   * envelopes are always period-scoped) and naturally sorts
-   * chronologically - the standard "spending over time" view every
-   * comparable budgeting app leads with.
+   * By expense date, not envelope creation date: people organise
+   * envelopes differently - one per month ("Octubre - Davi Scoti") or one
+   * long-lived envelope per purpose ("Aseo") - and only the expense date
+   * charts both correctly. Grouping by envelope.createdAt put a whole
+   * year of a long-lived envelope into the month it was created.
    */
   async getMonthlySpending(
     userId: string,
@@ -327,36 +339,38 @@ export class DashboardRepository {
     limit: number,
     currency: string,
   ) {
-    const rows = await this.withUserAndYear(userId, year)
-      .andWhere('envelope.currency = :currency', { currency })
-      .select("TO_CHAR(envelope.createdAt, 'YYYY-MM')", 'month')
-      .addSelect('COALESCE(SUM(envelope.spent), 0)', 'spent')
-      .addSelect(
-        'COALESCE(SUM(CASE WHEN envelope.amount IS NOT NULL THEN GREATEST(envelope.amount - envelope.spent, 0) ELSE 0 END), 0)',
-        'available',
-      )
-      .groupBy("TO_CHAR(envelope.createdAt, 'YYYY-MM')")
+    const qb = this.expenseRepository
+      .createQueryBuilder('expense')
+      .innerJoin('expense.envelope', 'envelope')
+      .where('envelope.userId = :userId', { userId })
+      .andWhere('expense.currency = :currency', { currency });
+
+    if (year) {
+      qb.andWhere('EXTRACT(YEAR FROM expense.date) = :year', { year });
+    }
+
+    const rows = await qb
+      .select("TO_CHAR(expense.date, 'YYYY-MM')", 'month')
+      .addSelect('COALESCE(SUM(expense.amount), 0)', 'spent')
+      .groupBy("TO_CHAR(expense.date, 'YYYY-MM')")
       .orderBy('month', 'DESC')
       .limit(limit)
-      .getRawMany<{ month: string; spent: string; available: string }>();
+      .getRawMany<{ month: string; spent: string }>();
 
     return rows
-      .map((row) => ({
-        month: row.month,
-        spent: Number(row.spent),
-        available: Number(row.available),
-      }))
+      .map((row) => ({ month: row.month, spent: Number(row.spent) }))
       .reverse();
   }
 
   /**
-   * Distinct calendar years the user has envelopes in, most recent
-   * first - powers a year picker on the frontend.
+   * Distinct calendar years the user has expenses in, most recent first -
+   * the year picker's options, by the same expense dates the chart uses.
    */
   async getAvailableYears(userId: string): Promise<number[]> {
-    const rows = await this.repository
-      .createQueryBuilder('envelope')
-      .select('DISTINCT EXTRACT(YEAR FROM envelope.createdAt)', 'year')
+    const rows = await this.expenseRepository
+      .createQueryBuilder('expense')
+      .innerJoin('expense.envelope', 'envelope')
+      .select('DISTINCT EXTRACT(YEAR FROM expense.date)', 'year')
       .where('envelope.userId = :userId', { userId })
       .orderBy('year', 'DESC')
       .getRawMany<{ year: string }>();

@@ -43,9 +43,11 @@ describe('EnvelopesRepository', () => {
     leftJoin: jest.Mock;
     andWhere: jest.Mock;
     select: jest.Mock;
+    addSelect: jest.Mock;
     orderBy: jest.Mock;
-    skip: jest.Mock;
-    take: jest.Mock;
+    addOrderBy: jest.Mock;
+    offset: jest.Mock;
+    limit: jest.Mock;
     getManyAndCount: jest.Mock;
   };
 
@@ -55,9 +57,11 @@ describe('EnvelopesRepository', () => {
       leftJoin: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
-      skip: jest.fn().mockReturnThis(),
-      take: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      offset: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
       getManyAndCount: jest.fn(),
     };
 
@@ -112,12 +116,14 @@ describe('EnvelopesRepository', () => {
         { userId },
       );
       expect(mockQueryBuilder.andWhere).not.toHaveBeenCalled();
+      // Newest period first by default; the real ordering is asserted
+      // against Postgres in envelopes.e2e-spec.ts.
       expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'envelope.createdAt',
+        'period_end',
         'DESC',
       );
-      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
-      expect(mockQueryBuilder.take).toHaveBeenCalledWith(20);
+      expect(mockQueryBuilder.offset).toHaveBeenCalledWith(0);
+      expect(mockQueryBuilder.limit).toHaveBeenCalledWith(20);
     });
 
     it('should compute the correct offset for page 3', async () => {
@@ -128,8 +134,8 @@ describe('EnvelopesRepository', () => {
       await repository.findByUserIdLight('user-123', 3, 20);
 
       // Assert
-      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(40);
-      expect(mockQueryBuilder.take).toHaveBeenCalledWith(20);
+      expect(mockQueryBuilder.offset).toHaveBeenCalledWith(40);
+      expect(mockQueryBuilder.limit).toHaveBeenCalledWith(20);
     });
 
     it('should filter by search term across name and category', async () => {

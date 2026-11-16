@@ -24,6 +24,10 @@ export const ERROR_MESSAGES = {
   CATEGORY_NOT_FOUND: 'Category not found',
   CATEGORY_ALREADY_EXISTS: 'Ya tienes una categoría con ese nombre',
 
+  // Payment method errors
+  PAYMENT_METHOD_NOT_FOUND: 'Payment method not found',
+  PAYMENT_METHOD_ALREADY_EXISTS: 'Ya tienes un medio de pago con ese nombre',
+
   // Validation errors
   AMOUNT_MUST_BE_POSITIVE: 'Amount must be greater than 0',
   INVALID_DATE_FORMAT: 'La fecha debe tener el formato YYYY-MM-DD',

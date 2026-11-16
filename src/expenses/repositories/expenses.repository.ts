@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository, SelectQueryBuilder } from 'typeorm';
+import {
+  Brackets,
+  EntityManager,
+  Repository,
+  SelectQueryBuilder,
+} from 'typeorm';
 import { Expense } from '../entities/expense.entity';
 
 interface ExpenseFilters {
@@ -8,6 +13,9 @@ interface ExpenseFilters {
   endDate?: string;
   search?: string;
   sort?: 'ASC' | 'DESC';
+  sortBy?: 'date' | 'amount';
+  paymentMethodIds?: string[];
+  includeUnassigned?: boolean;
 }
 
 @Injectable()
@@ -19,7 +27,7 @@ export class ExpensesRepository {
 
   async findById(id: string, manager?: EntityManager) {
     const repo = manager ? manager.getRepository(Expense) : this.repository;
-    return repo.findOneBy({ id });
+    return repo.findOne({ where: { id }, relations: { paymentMethod: true } });
   }
 
   async create(expenseData: Partial<Expense>, manager?: EntityManager) {
@@ -75,6 +83,25 @@ export class ExpensesRepository {
       );
     }
 
+    const methodIds = filters.paymentMethodIds ?? [];
+    if (methodIds.length > 0 || filters.includeUnassigned) {
+      // Any of the selected methods, or none at all when asked - an OR
+      // inside its own brackets so it cannot leak past the envelope
+      // condition above.
+      query.andWhere(
+        new Brackets((byMethod) => {
+          if (methodIds.length > 0) {
+            byMethod.orWhere('expense.paymentMethodId IN (:...methodIds)', {
+              methodIds,
+            });
+          }
+          if (filters.includeUnassigned) {
+            byMethod.orWhere('expense.paymentMethodId IS NULL');
+          }
+        }),
+      );
+    }
+
     return query;
   }
 
@@ -84,14 +111,23 @@ export class ExpensesRepository {
     page: number,
     limit: number,
   ) {
-    const query = this.buildFilteredQuery(envelopeId, filters);
+    const query = this.buildFilteredQuery(
+      envelopeId,
+      filters,
+    ).leftJoinAndSelect('expense.paymentMethod', 'paymentMethod');
 
     // Most recent first by default - the conventional order for a
     // transaction/expense history (what did I just spend, not what did
     // I spend first), and what the frontend's own "Actividad reciente"
     // dashboard widget already assumes for expenses.
     const sortOrder = filters.sort || 'DESC';
-    query.orderBy('expense.date', sortOrder);
+    if (filters.sortBy === 'amount') {
+      // Ties (same amount) fall back to newest first.
+      query.orderBy('expense.amount', sortOrder);
+      query.addOrderBy('expense.date', 'DESC');
+    } else {
+      query.orderBy('expense.date', sortOrder);
+    }
     query.addOrderBy('expense.createdAt', 'DESC');
     query.skip((page - 1) * limit).take(limit);
 

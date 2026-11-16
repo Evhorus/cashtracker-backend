@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { Envelope } from '../entities/envelope.entity';
 import { Expense } from '../../expenses/entities/expense.entity';
+import type { EnvelopeSort } from '../dto/get-envelopes-filter.dto';
 import {
   buildEnvelopeStatusPredicate,
   type EnvelopeStatusFilter,
@@ -12,6 +13,12 @@ import {
  * Custom repository for Envelope entity
  * Encapsulates complex queries and data access logic
  */
+export interface EnvelopeListFilters {
+  search?: string;
+  status?: EnvelopeStatusFilter;
+  sort?: EnvelopeSort;
+}
+
 @Injectable()
 export class EnvelopesRepository {
   constructor(
@@ -32,7 +39,7 @@ export class EnvelopesRepository {
     userId: string,
     page: number,
     limit: number,
-    filters: { search?: string; status?: EnvelopeStatusFilter } = {},
+    filters: EnvelopeListFilters = {},
   ) {
     const query = this.repository
       .createQueryBuilder('envelope')
@@ -75,10 +82,44 @@ export class EnvelopesRepository {
       }
     }
 
-    query.orderBy('envelope.createdAt', 'DESC');
-    query.skip((page - 1) * limit).take(limit);
+    // The period it covers: its latest expense, or its creation date
+    // while it has none - the date its card shows.
+    const direction = filters.sort === 'oldest' ? 'ASC' : 'DESC';
+    query.addSelect(
+      `COALESCE((SELECT MAX(expense.date) FROM expense WHERE expense."envelopeId" = envelope.id), envelope.created_at::date)`,
+      'period_end',
+    );
+    query.orderBy('period_end', direction);
+    query.addOrderBy('envelope.createdAt', direction);
+    // offset/limit rather than skip/take: the only join is many-to-one,
+    // so rows never multiply, and skip/take's two-query pagination
+    // cannot order by a computed column.
+    query.offset((page - 1) * limit).limit(limit);
 
     return query.getManyAndCount();
+  }
+
+  /**
+   * First and last expense date of each envelope, in one grouped query
+   * for a whole page of the list. `::text` keeps them `YYYY-MM-DD`: the
+   * pg driver would otherwise turn a raw `date` into a JS Date at local
+   * midnight. Envelopes without expenses are simply absent.
+   */
+  async findExpenseDateRanges(
+    envelopeIds: string[],
+  ): Promise<Map<string, { first: string; last: string }>> {
+    if (envelopeIds.length === 0) return new Map();
+    const rows = await this.repository.manager
+      .createQueryBuilder(Expense, 'expense')
+      .select('expense.envelopeId', 'envelopeId')
+      .addSelect('MIN(expense.date)::text', 'first')
+      .addSelect('MAX(expense.date)::text', 'last')
+      .where('expense.envelopeId IN (:...envelopeIds)', { envelopeIds })
+      .groupBy('expense.envelopeId')
+      .getRawMany<{ envelopeId: string; first: string; last: string }>();
+    return new Map(
+      rows.map((row) => [row.envelopeId, { first: row.first, last: row.last }]),
+    );
   }
 
   /**
@@ -97,7 +138,7 @@ export class EnvelopesRepository {
   async findByIdWithExpenses(id: string) {
     return this.repository.findOne({
       where: { id },
-      relations: { expenses: true, category: true },
+      relations: { expenses: { paymentMethod: true }, category: true },
     });
   }
 

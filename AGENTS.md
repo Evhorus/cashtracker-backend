@@ -82,7 +82,8 @@ envelopes and expenses) so it's a lighter version of this shape.
 - `src/auth`: Handles authentication using Clerk and Passport. Contains guards (`ClerkAuthGuard`) and decorators (`@CurrentUser`, `@Public`). `ClerkAuthGuard` is registered globally via `APP_GUARD`, so every route requires auth by default - use `@Public()` to opt a route out (e.g. health check).
 - `src/envelopes`: Manages envelope lifecycle. Uses a Data Mapper pattern with `EnvelopesRepository` and `Envelope` entity.
 - `src/expenses`: Manages expense lifecycle. Similar structure to envelopes, with `ExpensesRepository` and `Expense` entity. Nested under `/api/envelopes/:envelopeId/expenses`.
-- `src/dashboard`: Aggregates envelope/expense data into a summary view (`GET /api/dashboard/summary`), optionally scoped to a calendar year.
+- `src/dashboard`: Aggregates envelope/expense data into a summary view (`GET /api/dashboard/summary`). It must read the same however a user organises envelopes (one per month, or one long-lived envelope per purpose): anything over time (monthly chart, `year`, available years, breakdowns) follows each **expense's date**, never the envelope's `createdAt`; the envelope totals (assigned, spent, available, exceeded) are the envelopes' current state and are not date-filtered. Available and exceeded are reported separately, never netted.
+- `src/payment-methods`: Per-user payment methods (card, cash, transfer) with an optional statement `cutDay` for credit cards. Optional on every expense (`expense.paymentMethodId`, `ON DELETE SET NULL`): a user who never creates one sees no change. Generic on purpose - it is "what was this paid with", independent of how envelopes are organised.
 - `src/database`: Centralized TypeORM configuration and migration management.
 - `src/common`: Shared utilities, pipes, shared DTOs (`PaginationQueryDto`, `PaginatedResponseDto`), and global constants (`ERROR_MESSAGES`).
 - `src/config`: Environment variable validation using Zod.
