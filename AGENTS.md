@@ -24,7 +24,7 @@ this file directly.
 - Run all unit tests: `pnpm run test`
 - Run tests in watch mode: `pnpm run test:watch`
 - Run tests with coverage: `pnpm run test:cov`
-- Run E2E tests: `pnpm run test:e2e`
+- Run E2E tests: `pnpm run test:e2e` - against a throwaway Postgres on this machine only (`.env.test`, see `.env.template` > TESTS for the Docker command). `test/assert-safe-test-database.ts` aborts on any non-local host, because the suites delete every row between tests.
 - Run a single test: `pnpm run test <path-to-file>`
 
 ### Database Migrations

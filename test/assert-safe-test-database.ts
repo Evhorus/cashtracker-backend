@@ -14,13 +14,13 @@ import { resolve } from 'node:path';
  * check always passed. The realistic mistake - pasting the everyday
  * connection string into `.env.test` - sailed straight through.
  *
- * So the check compares the target against whatever `.env` points at and
- * aborts when they are the same database. That is a stronger test than
- * looking for "test" in the name, and it does not dictate how databases
- * are named: hosted Postgres (Neon, Supabase, RDS) typically leaves every
- * branch or project's database called the same thing, so a name-based
- * rule rejects perfectly good test databases while a URL comparison
- * catches the case that actually destroys data.
+ * So the check has two rules:
+ *
+ * 1. The target must be on this machine (localhost, 127.0.0.1, ::1) - a
+ *    throwaway Postgres in Docker locally, the service container in CI.
+ *    "Not the everyday database" was not enough: .env.test once pointed
+ *    at a second Neon branch, which these suites happily wiped.
+ * 2. It must not be the database `.env` points at, even locally.
  *
  * Fails closed: a missing DATABASE_URL, or one that can't be parsed,
  * aborts too.
@@ -36,8 +36,7 @@ interface DatabaseIdentity {
   name: string;
 }
 
-export type TestDatabaseCheck =
-  { ok: true; warning?: string } | { ok: false; error: string };
+export type TestDatabaseCheck = { ok: true } | { ok: false; error: string };
 
 function identify(rawUrl: string): DatabaseIdentity | null {
   try {
@@ -51,6 +50,9 @@ function identify(rawUrl: string): DatabaseIdentity | null {
     return null;
   }
 }
+
+/** Loopback only. `URL.hostname` keeps the brackets around IPv6. */
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
 function sameDatabase(a: DatabaseIdentity, b: DatabaseIdentity): boolean {
   return a.host === b.host && a.port === b.port && a.name === b.name;
@@ -85,6 +87,19 @@ export function checkTestDatabase(
     };
   }
 
+  if (!LOCAL_HOSTS.has(target.host)) {
+    return {
+      ok: false,
+      error:
+        `e2e aborted: DATABASE_URL points at ${target.host}, which is not on ` +
+        'this machine. These suites DELETE FROM envelope and DELETE FROM ' +
+        'expense between tests, so they only run against a throwaway local ' +
+        'Postgres, e.g. `docker run -d --rm --name cashtracker-pg -p ' +
+        '127.0.0.1:55432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust ' +
+        'postgres:17-alpine` plus `createdb cashtracker_test`.',
+    };
+  }
+
   const everyday = everydayUrl ? identify(everydayUrl) : null;
 
   if (everyday && sameDatabase(target, everyday)) {
@@ -97,18 +112,6 @@ export function checkTestDatabase(
         'destroy real data. Point .env.test at a separate database - a ' +
         'different Neon branch or project is enough; the name may stay the ' +
         'same.',
-    };
-  }
-
-  if (!everydayUrl) {
-    // Nothing to compare against. Not fatal - CI is expected to provide a
-    // throwaway database - but say so, because the guard verified nothing.
-    return {
-      ok: true,
-      warning:
-        '[e2e] No .env DATABASE_URL found, so the target database could not ' +
-        'be compared against the everyday one. Make sure DATABASE_URL is a ' +
-        'throwaway database: these suites delete rows between tests.',
     };
   }
 
@@ -134,5 +137,4 @@ export function assertSafeTestDatabase(): void {
   );
 
   if (!result.ok) throw new Error(result.error);
-  if (result.warning) console.warn(result.warning);
 }

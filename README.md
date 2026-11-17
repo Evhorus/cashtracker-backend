@@ -72,7 +72,7 @@ pnpm run test
 # Tests en modo watch
 pnpm run test:watch
 
-# Tests e2e
+# Tests e2e (solo contra un Postgres local desechable: ver .env.template > TESTS)
 pnpm run test:e2e
 
 # Cobertura de tests
